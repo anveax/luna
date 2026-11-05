@@ -1,0 +1,32 @@
+import array_init (in int, out blob);
+import smulv2_part (in blob, in blob, out int);
+import sum_two_num (in int, in int, out int);
+import int_init (in int, out int);
+
+#define N 10
+
+sub smulv2(count, sum) {
+	name count, sum, arr, arr2, part_sum, tmp;
+	for i=0..$N-1 {
+		array_init(count, arr[i]);
+		array_init(count, arr2[i]);
+		smulv2_part(arr[i], arr2[i], part_sum[i]);
+	}
+	
+	int_init(part_sum[0], tmp[0]);
+	for i=1..$N/2-1 {
+		sum_two_num(tmp[i-1], part_sum[i], tmp[i]);
+	}
+
+	int_init(part_sum[$N/2], tmp[$N/2]);
+	for i=$N/2+1..$N-1 {
+		sum_two_num(tmp[i-1], part_sum[i], tmp[i]);
+	}
+	
+	sum_two_num(tmp[$N/2-1], tmp[$N-1], sum);
+}
+
+interface "clif" main (
+	"string" => int count,
+	"string" <= int sum
+) on smulv2;

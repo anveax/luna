@@ -1,0 +1,28 @@
+{
+  "type": "codefrag",
+  "format": "clif",
+  "executable": "mpi_execute.py",
+  "exec_args": [],
+  "params": [
+    {
+      "kind": "input",
+      "format": "path",
+      "type": "blob"
+    },
+    {
+      "kind": "input",
+      "format": "string",
+      "type": "int32"
+    },
+    {
+      "kind": "input",
+      "format": "path",
+      "type": "blob"
+    },
+    {
+      "kind": "output",
+      "format": "path",
+      "type": "blob"
+    }
+  ]
+}

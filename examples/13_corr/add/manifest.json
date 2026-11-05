@@ -1,0 +1,11 @@
+{
+	"type": "codefrag",
+	"format": "cpf",
+	"c_func_name": "add",
+	"params": [
+		{ "kind": "output", "format": "int32", "type": "int32" },
+		{ "kind": "input", "format": "int32", "type": "int32" },
+		{ "kind": "input", "format": "int32", "type": "int32" }
+	],
+	"src": "../fft2.c"
+}

@@ -1,0 +1,51 @@
+import add(out int, in int, in int);
+import compute_size(in blob, out int);
+import parse_opora(in blob opora, in int param,
+	out int Fs, out int L, out int M, out int p, out blob S, out blob meta);
+import calc_coeff(in blob S, in int L, out int a, out int b,
+	out real A);
+import calc_exps(in int M, in int p, out blob W);
+import fft_i(in blob, in blob, in int, in int, out blob);
+import extract_samples(in blob X_raw, in int M, in int Fs,
+	out blob X);
+import fft_multconj_rfft(in blob X, in blob W, in blob S1,
+	in int M, in int p, out blob X1);
+import calc_output_trace(in blob X1, in int L,
+	in real A, in int a, in int b, out real B, out real C, out blob X2);
+import make_pc(in blob X1, in real B, in real C, in int L,
+	in blob meta, out blob PC);
+
+#define CORR_COUNT 2
+
+sub corr(X_raw, opora, argv3) {
+	name size, sum_size, W_size, S1_size, X_size, X1_size, X2_size,
+		Fs, L, M, p, S,
+		a, b, A,
+		X, X1, X2, B, C, X2PC,
+		X_raw, opora, argv3;
+
+	parse_opora(opora, argv3, Fs, L, M, p, S[0], meta);
+
+	calc_coeff(S[0], L, a, b, A);
+
+	calc_exps(M, p, W);
+
+	fft_i(S[0], W, M, p, S[1]);
+
+	for i=0..$CORR_COUNT-1 {
+		extract_samples(X_raw[i], M, Fs, X[i]);
+		fft_multconj_rfft(X[i], W, S[1], M, p, X1[i]);
+		calc_output_trace(X1[i], L, A, a, b, B[i], C[i], X2[i]);
+		make_pc(X2[i], B[i], C[i], L, meta, X2PC[i]);
+	}
+
+}
+
+interface "clif" main (
+	"path" => blob X_raw[0],
+	"path" => blob X_raw[1],
+	"path" => blob opora,
+	"string" => int argv3,
+	"path" <= blob X2PC[0],
+	"path" <= blob X2PC[1]
+) on corr;

@@ -1,0 +1,10 @@
+import ppjson_clif(in blob, out blob);
+
+sub pp_json(prog_ja, prog_json) {
+    ppjson_clif(prog_ja, prog_json);
+}
+
+interface "clif" main (
+	"path" => blob prog_ja,
+	"stdout" <= blob prog_json
+) on pp_json;

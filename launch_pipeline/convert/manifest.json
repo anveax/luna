@@ -1,0 +1,18 @@
+{
+  "type": "codefrag",
+  "format": "clif",
+  "executable": "../../scripts/convert.js",
+  "exec_args": [],
+  "params": [
+    {
+      "kind": "input",
+      "format": "stdin",
+      "type": "blob"
+    },
+    {
+      "kind": "output",
+      "format": "stdout",
+      "type": "blob"
+    }
+  ]
+}

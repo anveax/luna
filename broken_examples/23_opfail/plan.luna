@@ -1,0 +1,17 @@
+// compute sum of all numbers from 1 to N
+
+import inc(in int, out int);
+import sum(in int, in int, out int);
+
+sub plan(n, m) {
+	name tmp, n, m;
+	// only one alternative should execute
+	inc(n, tmp);
+	sum(n, 2, m);
+	inc(tmp, m);
+}
+
+interface "clif" main (
+	"string" => int n,
+	"string" <= int m
+) on plan;

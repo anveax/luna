@@ -1,0 +1,11 @@
+import dup(in blob, out blob);
+
+sub clif_import() {
+	name x, res;
+	dup(x, res);
+}
+
+interface "clif" main (
+	"path" => blob x,
+	"path" <= blob res
+) on clif_import;

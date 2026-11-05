@@ -1,0 +1,23 @@
+#!/bin/bash
+
+INPUT="12"
+OUTPUT="./correct"
+
+set -e
+
+if [[ "$AZ" == "" ]]; then
+	echo "\$AZ not set"
+	exit 1;
+fi
+
+if [[ "$BUILD_DIR" == "" ]]; then
+	echo "\$BUILD_DIR not set"
+	exit 1;
+fi
+
+BD=$BUILD_DIR
+FILE=`ls *.luna`
+
+$AZ/bin/luna $FILE --stdin_pr=in --stdout_pr=out --np=2 > "$BD/result"
+
+diff $OUTPUT $BD/result

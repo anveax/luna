@@ -1,0 +1,23 @@
+{
+  "type": "codefrag",
+  "format": "clif",
+  "executable": "../../scripts/gen_schedule.js",
+  "exec_args": [],
+  "params": [
+    {
+      "kind": "input",
+      "format": "path",
+      "type": "blob"
+    },
+    {
+      "kind": "input",
+      "format": "string",
+      "type": "int32"
+    },
+    {
+      "kind": "output",
+      "format": "stdout",
+      "type": "blob"
+    }
+  ]
+}

@@ -1,0 +1,51 @@
+#!/bin/bash
+
+INPUT="20"
+OUTPUT="21"
+
+set -e
+set -x
+
+if [[ "$AZ" == "" ]]; then 
+	echo "\$AZ not set"
+	exit 1;
+fi
+
+if [[ "$BUILD_DIR" == "" ]]; then 
+	echo "\$BUILD_DIR not set"
+	exit 1;
+fi
+
+BD=$BUILD_DIR
+
+# Start web service
+node $AZ/src/web_service.js >/dev/null 2>/dev/null &
+PID=`echo $!`
+
+sleep 1
+
+
+rm -rf $BD/codefrag
+mkdir $BD/codefrag
+bash curl.txt > $BD/codefrag/prog.c
+cp manifest.json $BD/codefrag
+
+# Stop web service
+kill -2 $PID
+
+# wrap into CLIF
+rm -rf $BD/wrapped
+echo -e "$BD/codefrag\n$BD/wrapped" | \
+	node $AZ/scripts/gen_clif_cpf_wrapper.js
+
+# build everything
+gcc -I $AZ/src -g ./inc/*.c $BD/codefrag/*.c $AZ/src/clif.c \
+	$BD/wrapped/*.c -o $BD/a.out
+
+# run
+echo -e "$INPUT" | $BD/a.out > $BD/result
+
+# verify output
+echo -e "$OUTPUT" > $BD/correct
+diff $BD/correct $BD/result
+

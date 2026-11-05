@@ -1,0 +1,109 @@
+import op1(in real, in real, in real, out real);
+import op2(in real, out real);
+import op3(in real, in real, in real, in real, out real);
+import op4(in real, in real, out real);
+import op5(in real, in real, out real);
+import op6(in real, in real, out real);
+import op7(in real, in real, in real, out real);
+import op8(in real, in real, in real, out real);
+import op9(in real, in real, in real, out real);
+import op10(in real, in real, out real);
+import op11(in real, in real, out real);
+import op12(in real, in real, in real, in real, out real);
+import op13(in real, in real, in real, out real);
+import op14(in real, in real, in real, out real);
+import op15(in real, in real, out real);
+import op16(in real, in real, out real);
+import op17(in real, in real, out real);
+import op18(in real, in real, in real, out real);
+import op19(in real, in real, in real, out real);
+import op20(in real, in real, in real, out real);
+import op21(in real, in real, in real, out real);
+import op22(in real, in real, in real, out real);
+import op23(in real, in real, in real, out real);
+
+sub triangle(
+    a, b, c,       // Стороны треугольника
+    angleA, angleB,     // Углы при вершинах
+    P, p,               // Периметр и полупериметр
+    S,                       // Площадь
+    r, R,               // Радиусы вписанной/описанной окружностей
+    med_a, med_b, med_c,   // Медианы
+    bis_a, bis_b, bis_c,   // Биссектрисы
+    h_a, h_b, h_c  // Высоты
+) {
+    // Вычисление периметра
+    op1(a, b, c, P);
+    
+    // Вычисление полупериметра
+    op2(P, p);
+    
+    // Формула Герона для площади
+    op3(a, b, c, p, S);
+    
+    // Площадь через основание и высоту
+    op4(a, h_a, S);
+    
+    // Высота через площадь и основание
+    op5(S, a, h_a);
+    
+    // Теорема Пифагора
+    op6(a, b, c);
+    
+    // Теорема синусов (сторона)
+    op7(angleA, angleB, b, a);
+    
+    // Теорема косинусов (сторона)
+    op8(a, b, angleC, c);
+    
+    // Теорема косинусов (угол)
+    //op9(a, b, c, angleC);
+    
+    // Сумма углов треугольника
+    op10(angleA, angleB, angleC);
+    
+    // Радиус вписанной окружности
+    op11(S, p, r);
+    
+    // Радиус описанной окружности
+    op12(a, b, c, S, R);
+    
+    // Медиана к стороне a
+    op13(a, b, c, med_a);
+    
+    // Биссектриса угла A
+    op14(b, c, angleA, bis_a);
+    
+    // Радиус описанной окружности (через угол)
+    op15(a, angleA, R);
+    
+    // Высота к стороне b
+    op16(S, b, h_b);
+    
+    // Высота к стороне c
+    op17(S, c, h_c);
+    
+    // Медиана к стороне b
+    op18(a, b, c, med_b);
+    
+    // Медиана к стороне c
+    op19(a, b, c, med_c);
+    
+    // Биссектриса угла B
+    op20(a, c, angleB, bis_b);
+    
+    // Биссектриса угла C
+    op21(a, b, angleC, bis_c);
+    
+    // Площадь через стороны и угол
+    op22(a, b, angleC, S);
+    
+    // Радиус вписанной окружности (прямоугольный треугольник)
+    op23(a, b, c, r);
+}
+
+interface "clif" main (
+	"string" => real a,
+	"string" => real b,
+	"string" <= real S
+) on triangle;

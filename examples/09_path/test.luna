@@ -1,0 +1,12 @@
+// compute sum of all numbers from 1 to N
+
+import "rev" (in blob, out blob) as c_reverse;
+
+sub test(direct, reversed) {
+	c_reverse(direct, reversed);
+}
+
+interface "clif" main (
+	"path" => blob direct,
+	"path" <= blob reversed
+) on test;

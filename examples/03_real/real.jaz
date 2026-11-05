@@ -1,0 +1,38 @@
+{
+	"iface": {
+		"main": {
+			"cm": "local://cm/inc",
+			"format": "clif",
+			"params": [
+				{
+					"format": "string",
+					"type": "real64",
+					"kind": "input",
+					"target": "x"
+				},
+				{
+					"format": "string",
+					"type": "real64",
+					"kind": "output",
+					"source": "y"
+				}
+			]
+		}
+	},
+	"cm": {
+		"inc": {
+			"type": "simple",
+			"names": {
+				"x": {},
+				"y": {}
+			},
+			"ops": {
+				"a": {
+					"type": "simple",
+					"code": "fs://inc_real",
+					"args": ["x", "y"]
+				}
+			}
+		}
+	}
+}

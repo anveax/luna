@@ -1,0 +1,13 @@
+{"init" : {"type" : "import","external_id": "init","alias": "init", "params" : [{"name": "count","kind": "input","type": "int32"},{"name": "numbers","kind": "output","type": "blob"}]}
+,
+"sum" : {"type" : "import","external_id": "sum","alias": "sum", "params" : [{"name": "numbers","kind": "input","type": "blob"},{"name": "sum","kind": "output","type": "int32"}]}
+,
+"arr" : {"type" : "struct","where":{"type":"luna"}
+,"args" : ["count","sum"],"body" : [
+{"type" : "dfs","names" : ["count", "sum", "arr"],"begin" : 113}
+, {"type" : "exec","id" : ["_l8"],"code" : "init","args" : [{"type": "id", "ref":["count"], "begin": 141},{"type": "id", "ref":["arr"], "begin": 148}],"rules" : [],"begin" :136}
+,{"type" : "exec","id" : ["_l9"],"code" : "sum","args" : [{"type": "id", "ref":["arr"], "begin": 159},{"type": "id", "ref":["sum"], "begin": 164}],"rules" : [],"begin" :155}
+],"begin" : 90,"end" : 171}
+,
+"main" : {"type" : "iface","format": "clif","name": "main","sub": "arr","params" : [{"target": ["count"],"kind": "input","format": "string","type": "int32"},{"source": ["sum"],"kind": "output","format": "string","type": "int32"}]}
+}

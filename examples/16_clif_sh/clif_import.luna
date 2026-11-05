@@ -1,0 +1,12 @@
+import min(in int, in int, out int);
+
+sub clif_import() {
+	name x, y, res;
+	min(x, y, res);
+}
+
+interface "clif" main (
+	"string" => int x,
+	"string" => int y,
+	"string" <= int res
+) on clif_import;

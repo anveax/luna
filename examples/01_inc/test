@@ -1,0 +1,25 @@
+#!/bin/bash
+
+JAZ="./main.jaz"
+INPUT="20\n10"
+OUTPUT="31"
+
+set -e
+
+if [[ "$AZ" == "" ]]; then 
+	echo "\$AZ not set"
+	exit 1;
+fi
+
+if [[ "$BUILD_DIR" == "" ]]; then 
+	echo "\$BUILD_DIR not set"
+	exit 1;
+fi
+
+BD=$BUILD_DIR
+
+echo -e "$INPUT" | $AZ/bin/luna --jaz $JAZ > "$BD/result"
+
+# verify output
+echo -e "$OUTPUT" > $BD/correct
+diff $BD/correct $BD/result

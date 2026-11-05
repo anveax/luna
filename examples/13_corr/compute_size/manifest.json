@@ -1,0 +1,10 @@
+{
+	"type": "codefrag",
+	"format": "cpf",
+	"c_func_name": "compute_size",
+	"params": [
+		{ "kind": "input", "format": "blob", "type": "blob" },
+		{ "kind": "output", "format": "int32", "type": "int32" }
+	],
+	"src": ["../ucodes.c", "../fft2.c"]
+}

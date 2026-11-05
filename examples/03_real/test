@@ -1,0 +1,30 @@
+#!/bin/bash
+
+JAZ="real.jaz"
+UCODES="ucodes.c"
+INPUT="12.3"
+OUTPUT="13.4"
+
+set -e
+
+if [[ "$AZ" == "" ]]; then 
+	echo "\$AZ not set"
+	exit 1;
+fi
+
+if [[ "$BUILD_DIR" == "" ]]; then 
+	echo "\$BUILD_DIR not set"
+	exit 1;
+fi
+
+
+BD=$BUILD_DIR
+
+echo -e "$INPUT" | $AZ/bin/luna --jaz $JAZ > "$BD/result"
+
+# verify output
+RES=`cat $BD/result`
+if (( $(echo "$RES != $OUTPUT" | bc -l) )); then
+	exit 1
+fi
+

@@ -1,0 +1,28 @@
+#!/bin/bash
+
+INPUT="data/16_11011500.U8831Vk00\ndata/16_11011500.U8831Vk00\n\
+data/opora.dat\n300\n\
+$BUILD_DIR/conv1.out\n$BUILD_DIR/conv2.out"
+
+OUTPUT=""
+
+set -e
+
+if [[ "$AZ" == "" ]]; then 
+	echo "\$AZ not set"
+	exit 1;
+fi
+
+if [[ "$BUILD_DIR" == "" ]]; then 
+	echo "\$BUILD_DIR not set"
+	exit 1;
+fi
+
+BD=$BUILD_DIR
+FILE=`ls *.luna`
+
+echo -e "$INPUT" | $AZ/bin/luna $FILE > "$BD/result"
+
+# verify output
+node pcdiff.js data/correct $BD/conv1.out
+node pcdiff.js data/correct $BD/conv2.out

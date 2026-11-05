@@ -1,0 +1,19 @@
+{
+	"type": "codefrag",
+	"format": "cpf",
+	"c_func_name": "inc",
+	"params": [
+		{
+			"kind": "input",
+			"format": "real64",
+			"type": "real64"
+		},
+		{
+			"kind": "output",
+			"format": "real64",
+			"type": "real64"
+		}
+	],
+	"src": "ucodes.c"
+}
+

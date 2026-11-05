@@ -1,0 +1,13 @@
+{
+	"type": "codefrag",
+	"format": "cpf",
+	"c_func_name": "calc_coeff",
+	"params": [
+		{ "kind": "input", "format": "blob", "type": "blob" },
+		{ "kind": "input", "format": "int32", "type": "int32" },
+		{ "kind": "output", "format": "int32", "type": "int32" },
+		{ "kind": "output", "format": "int32", "type": "int32" },
+		{ "kind": "output", "format": "real64", "type": "real64" }
+	],
+	"src": ["../ucodes.c", "../fft2.c"]
+}

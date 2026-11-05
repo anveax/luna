@@ -1,0 +1,9 @@
+{
+	"type": "codefrag",
+	"format": "cpf",
+	"c_func_name": "_cpf_auto_0",
+	"params": [
+		{ "kind": "input", "format": "int32" },
+		{ "kind": "output", "format": "int32" }
+	]
+}

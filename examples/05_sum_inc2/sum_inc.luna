@@ -1,0 +1,14 @@
+import inc(in int num, out int);
+import "sum" (in int, in int, out int) as sum;
+
+sub sum_inc(a,b,c) {
+	name a, b, c;
+	sum(a, b, c);
+	inc(c, res);
+}
+
+interface "clif" main (
+	"string" => int a,
+	"string" => int b,
+	"string" <= int res
+) on sum_inc;

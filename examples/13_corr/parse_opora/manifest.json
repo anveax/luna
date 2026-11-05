@@ -1,0 +1,16 @@
+{
+	"type": "codefrag",
+	"format": "cpf",
+	"c_func_name": "parse_opora",
+	"params": [
+		{ "kind": "input", "format": "blob", "type": "blob" },
+		{ "kind": "input", "format": "int32", "type": "int32" },
+		{ "kind": "output", "format": "int32", "type": "int32" },
+		{ "kind": "output", "format": "int32", "type": "int32" },
+		{ "kind": "output", "format": "int32", "type": "int32" },
+		{ "kind": "output", "format": "int32", "type": "int32" },
+		{ "kind": "output", "format": "blob", "type": "blob" },
+		{ "kind": "output", "format": "blob", "type": "blob" }
+	],
+	"src": ["../ucodes.c", "../fft2.c"]
+}

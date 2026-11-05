@@ -1,0 +1,777 @@
+%{
+
+#include <iostream>
+#include <fstream>
+#include <cassert>
+#include <algorithm>
+#include <string>
+#include <map>
+#include <vector>
+#include <sstream>
+#include <set>
+
+using namespace std;
+
+int cur=0;
+int yylex(void);
+void yyerror(const char*);
+string replace(const string &src, const string &from, const string &to, size_t times=(size_t)(-1));
+string shift(const string&);
+string auto_id();
+extern int line_num;
+
+string make_expr(const string &type, const string &body);
+string make_bin_expr(const string &type, const string &op1,
+	const string &op2, int op_pos);
+string make_un_expr(const string &type, const string &op1,
+    int op_pos);
+
+
+std::vector<string> headers;
+extern std::string headers_path;
+void add_header(const string &key, const string &value);
+
+#define YYSTYPE string
+#define TODO { std::cerr << "Not implemented in " << __FUNCTION__\
+	<< " (" << __FILE__ << ":" << __LINE__ << ")" << std::endl; abort(); }
+
+%}
+
+%token NAME INT REAL STRING
+%token EQ LB RB LT GT LSB RSB DIAP QMARK DBLEQ NEQ LEQ EQG GEQ AT
+%token SCOLON COMMA COLON DOT SHARP ARROW LARROW LARR RARR AMP
+%token PLUS MINUS MUL DIV MOD TAB WS SWS LN BUCK
+%token PIPE ASSIGN LCB RCB IDX DBLPIPE DBLAMP
+%token KW_CF KW_IMPORT KW_EXPORT KW_AS KW_FOR KW_IF KW_LET KW_VALUE
+%token KW_IN KW_ON KW_OUT KW_SIZE KW_SUB KW_WHILE KW_INT KW_BLOB KW_PATH KW_NAME KW_REAL KW_REAL32 KW_STRING KW_RUSH KW_STATIC KW_STATIC_FOR KW_UNROLLING KW_BLOCK KW_CPP INTERPRETER
+%token KW_INTERFACE KW_STDOUT KW_STDIN
+%nonassoc IFX
+%nonassoc KW_ELSE
+
+%left QMARK
+%left COLON
+%left DBLPIPE
+%left DBLAMP
+%left LEQ GEQ DBLEQ NEQ GT LT
+%left PLUS MINUS
+%left MUL DIV MOD
+%nonassoc NEG
+
+
+
+%%
+
+all:
+	program { 
+		cout << "{" << $1 << "}" << endl;
+
+		if (!headers.empty()) {
+			ofstream os(headers_path);
+		
+			os << "[" << endl;
+			for (vector<string>::iterator it=headers.begin();
+					it!=headers.end(); it++)
+			{
+				if (it != headers.begin()) {
+					os << ", " << endl;
+				}
+				os << *it;
+			}
+			os << endl << "]" << endl;
+
+			os.close();
+		}
+	}
+	;
+
+program:
+	sub_def
+	| program sub_def {
+		if ($1.empty() or $2.empty()) {
+			$$=$1+$2;
+		} else {
+			$$ = $1 + ",\n" + $2;
+		}
+	}
+	;
+
+sub_def:
+	KW_SUB control_pragma  code_id opt_params block
+	{
+		ostringstream os;
+
+		os << "\"" << $3 << "\" : {"
+			<< "\"type\" : \"struct\","
+			<< "\"where\":" << $2 <<  ","
+			<< "\"args\" : [" << $4 << "],"
+			<< "\"body\" : [\n" << $5 << "],"
+			<< "\"begin\" : " << @1.first_column << ","
+			<< "\"end\" : " << @5.last_column
+			<< "}" << endl;
+
+		$$ = os.str();
+	}
+	| KW_EXPORT KW_SUB code_id LB paramspec_csl RB block
+	{
+		ostringstream os;
+
+		os << "\"" << $3 << "\" : {"
+			<< "\"type\" : \"export\","
+			<< "\"code\" : \"" + $3 + "\", "
+			<< "\"params\" : [" << $5 << "],"
+			<< "\"body\" : [\n" << $7 << "]"
+			<< "}" << endl;
+
+		$$ = os.str();
+	}
+	| KW_CPP KW_SUB code_id opt_params KW_BLOCK LB INT RB
+	{
+		ostringstream os;
+
+		os << "\"" << $3 << "\" : {"
+			<< "\"type\" : \"foreign_cpp\","
+			<< "\"args\" : [" << $4 << "],"
+			<< "\"begin\" : " << @1.first_column << ","
+			<< "\"block_id\" : " << $7 << ""
+			<< "}" << endl;
+
+		$$ = os.str();
+	}
+	| KW_IMPORT STRING LB paramspec_csl RB KW_AS NAME SCOLON
+	{
+		ostringstream os;
+
+		string alias = $7;
+
+		os << "\"" << alias << "\" : {"
+			<< "\"type\" : \"import\","
+			<< "\"external_id\": " << $2 << ","
+			<< "\"alias\": \"" << alias << "\", "
+			<< "\"params\" : [" << $4 << "]"
+            << "}" << endl;
+
+		$$ = os.str();
+	}
+	| KW_IMPORT NAME LB paramspec_csl RB SCOLON
+	{
+		ostringstream os;
+
+		//string alias = $2.substr(1, $2.size()-2);
+		string alias = $2;
+
+		os << "\"" << alias << "\" : {"
+			<< "\"type\" : \"import\","
+			<< "\"external_id\": \"" << $2 << "\","
+			<< "\"alias\": \"" << $2 << "\", "
+			<< "\"params\" : [" << $4 << "]"
+            << "}" << endl;
+
+		$$ = os.str();
+	}
+	| KW_CPP NAME KW_BLOCK LB INT RB
+	{
+		add_header($2, $5);
+		$$="";
+	}
+	| KW_INTERFACE STRING NAME LB iface_params_csl RB KW_ON NAME SCOLON
+	{
+		ostringstream os;
+
+		os << "\"" << $3 << "\" : {"
+			<< "\"type\" : \"iface\","
+			<< "\"format\": " << $2 << ","
+			<< "\"name\": \"" << $3 << "\","
+			<< "\"sub\": \"" << $8 << "\","
+			<< "\"params\" : [" << $5 << "]"
+            << "}" << endl;
+
+		$$ = os.str();
+	}
+	;
+
+iface_params_csl:
+	iface_param { $$ = $1; }
+	| iface_params_csl COMMA iface_param {
+		$$ = $1 + "," + $3;
+	}
+	;
+
+iface_param:
+	STRING EQG type id
+	{
+		std::string s = "{";
+		$$ = s +
+			+ "\"target\": " + $4 + ","
+			+ "\"kind\": \"input\","
+			+ "\"format\": " + $1 + ","
+			+ "\"type\": " + $3 + ""
+			+ "}";
+	}
+	| STRING LEQ type id
+	{
+		std::string s = "{";
+		$$ = s +
+			+ "\"source\": " + $4 + ","
+			+ "\"kind\": \"output\","
+			+ "\"format\": " + $1 + ","
+			+ "\"type\": " + $3 + ""
+			+ "}";
+	}
+	;
+
+paramspec_csl:
+	paramspec { $$ = $1; }
+	| paramspec_csl COMMA paramspec {
+		$$ = $1 + "," + $3;
+	}
+	;
+
+paramspec:
+	kind type opt_name {
+		std::string s = "{";
+		if ($3 != "")
+			s += "\"name\": \"" + $3 + "\",";
+
+		$$ = s +
+			+ "\"kind\": " + $1 + ","
+			+ "\"type\": " + $2
+			+ "}";
+	}
+	;
+
+opt_name:
+	NAME { $$ = $1; }
+	| { $$ = "";}
+	;
+
+kind:
+	KW_IN { $$ = "\"input\""; }
+	| KW_OUT { $$ = "\"output\""; }
+	;
+
+type:
+	KW_INT { $$ = "\"int32\""; }
+	| KW_BLOB { $$ = "\"blob\""; }
+	| KW_REAL { $$ = "\"real64\""; }
+	| KW_STRING { $$ = "\"string\""; }
+	;
+
+block:
+	statement
+	| LCB opt_dfdecls statement_seq RCB opt_behavior
+	{
+		ostringstream os;
+
+		os << "{"
+			<< "\"type\" : \"dfs\","
+			<< "\"names\" : " << $2 << ","
+			<< "\"begin\" : " << @2.first_column
+			<< "}" << endl;
+
+		os << ", " << $3;
+
+		if ($5!="") {
+			os << "],\n\"rules\": [" << $5;
+		}
+
+		$$ = os.str();
+	}
+	;
+
+opt_dfdecls:
+	dfdecls { $$ = $1; }
+	| { $$ = "[]"; }
+	;
+
+dfdecls:
+	KW_NAME name_seq SCOLON { $$ = $2; }
+	;
+
+name_seq:
+	NAME { $$ = "[\"" + $1 + "\"]"; }
+	| name_seq COMMA NAME { $$ = $1.substr(0, $1.size()-1) + ", \"" + $3 + "\"]"; }
+	;
+
+statement_seq:
+	statement
+	| statement_seq statement { $$ = $1 + ',' + $2; }
+	;
+
+
+control_pragma: LARR where_type COMMA expr RARR
+		    {
+			ostringstream os;
+			os << "{"
+			<< "\"type\":" << $2 << ","
+			<< "\"count\":"<< $4
+			<< "}" << endl;
+			$$ = os.str(); 
+		    }
+		  |LARR where_type COMMA expr COMMA expr RARR 
+		    {
+			ostringstream os;
+			os << "{"
+			<< "\"type\":" << $2 << ","
+			<< "\"count\":"<< $4 << ","
+			<< "\"size\":" << $6
+			<< "}" << endl;
+			$$ = os.str(); 
+		    }
+		  |LARR where_type RARR
+		    {
+			ostringstream os;
+			os << "{"
+			<< "\"type\":" << $2
+			<< "}" << endl;
+			$$ = os.str(); 
+		    }
+		  | {
+			ostringstream os;
+			os << "{"
+			<< "\"type\":\"luna\""
+			<< "}" << endl;
+			$$ = os.str(); 
+		     }
+	    
+
+
+statement:
+    cf_statement
+    | let_statement
+    | for_statement
+    | while_statement
+    | if_statement
+    ;
+
+cf_statement: opt_label code_id opt_exprs opt_setdf_rules opt_rules opt_behavior SCOLON
+	{
+		ostringstream os;
+		string rules = $4;
+		if (rules.size() > 0 && $5.size() > 0) rules += ",";
+		rules += $5;
+		if (rules.size() > 0 && $6.size() > 0) rules += ",";
+		rules += $6;
+
+		os << "{"
+			<< "\"type\" : \"exec\","
+			<< "\"id\" : " << $1 << ","
+			<< "\"code\" : \"" << $2 << "\","
+			<< "\"args\" : [" << $3 << "],"
+			<< "\"rules\" : [" << rules << "],"
+			<< "\"begin\" :" << @2.first_column
+			<< "}" << endl;
+
+		$$ = os.str();
+	}
+	;
+
+opt_behavior:
+	AT LCB behv_pragmas_seq RCB { $$=$3; }
+	| { $$=""; }
+	;
+
+behv_pragmas_seq:
+	behv_pragma
+	| behv_pragmas_seq behv_pragma { $$ = $1 + "," + $2; }
+	;
+
+behv_pragma:
+	NAME id EQ expr SCOLON
+	{
+        ostringstream os;
+
+        os << "{"
+        << "\"ruletype\" : \"assign\","
+		<< "\"begin\" :" << @1.first_column << ","
+        << "\"type\" : \"rule\","
+        << "\"property\" : \"" << $1 << "\","
+        << "\"id\" : " << $2 << ","
+		<< "\"val\" : " << $4
+        << "}" << endl;
+
+        $$ = os.str();
+	}
+	| NAME id EQG expr SCOLON
+	{
+        ostringstream os;
+
+        os << "{"
+        << "\"ruletype\" : \"map\","
+		<< "\"begin\" :" << @1.first_column << ","
+        << "\"type\" : \"rule\","
+        << "\"property\" : \"" << $1 << "\","
+        << "\"id\" : " << $2 << ","
+		<< "\"expr\" : " << $4
+        << "}" << endl;
+
+        $$ = os.str();
+	}
+	| NAME id_seq SCOLON
+	{
+        ostringstream os;
+
+        os << "{"
+        << "\"ruletype\" : \"enum\","
+		<< "\"begin\" :" << @1.first_column << ","
+        << "\"type\" : \"rule\","
+        << "\"property\" : \"" << $1 << "\","
+        << "\"items\" : [" << $2 << "]"
+        << "}" << endl;
+
+        $$ = os.str();
+	}
+	| NAME COLON expr SCOLON
+	{
+        ostringstream os;
+
+        os << "{"
+        << "\"ruletype\" : \"expr\","
+		<< "\"begin\" :" << @1.first_column << ","
+        << "\"type\" : \"rule\","
+        << "\"property\" : \"" << $1 << "\","
+        << "\"expr\" : " << $3 
+        << "}" << endl;
+
+        $$ = os.str();
+	}
+	| name_seq SCOLON
+	{
+        ostringstream os;
+
+        os << "{"
+        << "\"ruletype\" : \"flags\","
+		<< "\"begin\" :" << @1.first_column << ","
+        << "\"type\" : \"rule\","
+        << "\"flags\" : " << $1
+        << "}" << endl;
+
+        $$ = os.str();
+	}
+	;
+
+id_seq:
+	id { $$=$1; }
+	| id_seq COMMA id { $$=$1+","+$3; }
+
+let_statement: KW_LET assign_seq block
+	{
+		ostringstream os;
+
+		os << "{" 
+			<< "\"type\" : \"let\","
+			<< "\"params\" : [" << $2 << "],"
+			<< "\"begin\" :" << @1.first_column << ","
+			<< "\"body\" : [" << $3
+			<< "]"
+			<< "}" << endl;
+
+		$$ = os.str();
+	}
+	;
+
+for_statement: KW_FOR control_pragma NAME EQ expr DIAP expr block
+	{
+		ostringstream os;
+
+		os << "{"
+			<< "\"type\" : \"for\","
+			<< "\"var\" : \"" << $3 << "\","
+			<< "\"first\" : " << $5 << ","
+			<< "\"last\" : " << $7 << ","
+			<< "\"where\" :" << $2 << ","
+			<< "\"begin\" :" << @1.first_column << ","
+			<< "\"body_begin\" :" << @8.first_column << ","
+			<< "\"body\" : [" << $8
+			<< "]"
+			<< "}" << endl;
+
+		$$ = os.str();
+	}
+	;
+
+while_statement: KW_WHILE control_pragma  expr COMMA NAME EQ expr DIAP KW_OUT id block
+	{
+		ostringstream os;
+
+		os << "{"
+			<< "\"type\" : \"while\","
+			<< "\"var\" : \"" << $5 << "\","
+			<< "\"cond\" : " << $3 << ","
+			<< "\"start\" : " << $7 << "," 
+			<< "\"wout\" : {\"type\":\"id\",\"ref\":" << $10 << "},"
+			<< "\"where\" :" << $2 << ","
+			<< "\"begin\" :" << @1.first_column << ","
+			<< "\"init_begin\" :" << @7.first_column << ","
+			<< "\"body_begin\" :" << @11.first_column << ","
+			<< "\"body\" : [" << $11
+			<< "]"
+			<< "}" << endl;
+
+		$$ = os.str();
+	}
+	;
+
+if_statement: KW_IF expr block %prec IFX
+	{
+		ostringstream os;
+
+		os << "{"
+			<< "\"type\" : \"if\","
+			<< "\"cond\" : " << $2 << ","
+			<< "\"begin\" :" << @1.first_column << ","
+			<< "\"body_begin\" :" << @3.first_column << ","
+			<< "\"body\" : [" << $3
+			<< "]"
+			<< "}" << endl;
+
+		$$ = os.str();
+	}
+/*	| KW_IF expr block KW_ELSE block
+	{
+		ostringstream os;
+
+		os << "{"
+			<< "\"type\" : \"if\","
+			<< "\"cond\" : " << $2 << ","
+			<< "\"body\" : [" << $3
+			<< "],";
+
+		std::string else_body=$5;
+
+		if (else_body.find("\"rules\"")!=std::npos) {
+		}
+
+		os << "\"body_else\" : [" << $5
+			<< "]"
+			<< "}" << endl;
+
+		$$ = os.str();
+	}*/
+	;
+
+assign_seq:
+	assign
+	| assign_seq COMMA assign { $$ = $1 + "," + $3; }
+	;
+
+assign:
+	NAME EQ expr { $$ = "{\"name\":\"" + $1 + "\",\"value\":" + $3 +"}"; }
+	;
+
+opt_label:
+	KW_CF id COLON { $$ = $2; }
+	|
+	{
+		ostringstream os;
+	
+		os << "[\"_l" << line_num << "\"]"; 
+		
+		$$ = os.str();
+	}
+	;
+
+id:
+	NAME { $$ = "[\"" + $1 + "\"]"; @$.first_column=@1.first_column; }
+	| id LSB expr RSB {
+		$$ = $1.substr(0, $1.size()-1) + ", " + $3 + "]";
+		@$.first_column=@1.first_column;
+	}
+	;
+
+opt_exprs:
+	LB exprs_seq RB { $$ = $2; }
+	| LB RB { $$ = ""; }
+	;
+
+exprs_seq:
+	expr
+	| exprs_seq COMMA expr { $$ = $1 + "," + $3; }
+	;
+
+opt_setdf_rules:
+	RARR opt_exprs
+	{
+        ostringstream os;
+
+        os << "{" 
+        << "\"ruletype\" : \"indexed_setdfs\","
+		<< "\"begin\" :" << @2.first_column << ","
+        << "\"type\" : \"rule\","
+//        << "\"cfs\" : [" << $2 << "],"
+        << "\"dfs\" : [" << $2 << "]"
+        << "}" << endl;
+
+		$$ = os.str();
+	}
+	| { $$ = ""; }
+	;
+
+opt_rules:
+    ARROW opt_exprs
+    {
+        ostringstream os;
+
+        os << "{"
+        << "\"ruletype\" : \"indexed\","
+		<< "\"begin\" :" << @2.first_column << ","
+        << "\"type\" : \"rule\","
+//        << "\"cfs\" : [" << $2 << "],"
+        << "\"dfs\" : [" << $2 << "]"
+        << "}" << endl;
+
+        $$ = os.str();
+     }
+    | {
+        ostringstream os;
+        os<<"";
+        $$ = os.str();
+    }
+    ;
+code_id:
+	NAME
+	;
+
+	
+base_expr:
+    INT { $$ = make_expr("iconst", "\"value\":" + $1); }
+	| REAL { $$ = make_expr("rconst", "\"value\":" + $1); }
+	| STRING { $$ = make_expr("sconst", "\"value\":" + $1); }
+	| KW_INT LB expr RB { $$ = make_expr("icast", "\"expr\":" + $3); }
+	| KW_REAL LB expr RB { $$ = make_expr("rcast", "\"expr\":" + $3); }
+	| KW_STRING LB expr RB { $$ = make_expr("scast", "\"expr\":" + $3); }
+	| LB expr RB { $$ = $2; }
+	| id { $$ = make_expr("id", "\"ref\":" + $1 + ", \"begin\": " + std::to_string(@1.first_column)); }
+	| MINUS base_expr %prec NEG { $$ = make_un_expr("neg", $2, @1.first_column); }
+expr:
+	base_expr
+	| expr PLUS expr { $$ = make_bin_expr("+", $1, $3, @2.first_column); }
+	| expr MINUS expr { $$ = make_bin_expr("-", $1, $3, @2.first_column); }
+	| expr MUL expr { $$ = make_bin_expr("*", $1, $3, @2.first_column); }
+	| expr DIV expr { $$ = make_bin_expr("/", $1, $3, @2.first_column); }
+	| expr MOD expr { $$ = make_bin_expr("%", $1, $3, @2.first_column); }
+	| expr LT expr { $$ = make_bin_expr("<", $1, $3, @2.first_column); }
+	| expr GT expr { $$ = make_bin_expr(">", $1, $3, @2.first_column); }
+	| expr LEQ expr { $$ = make_bin_expr("<=", $1, $3, @2.first_column); }
+	| expr GEQ expr { $$ = make_bin_expr(">=", $1, $3, @2.first_column); }
+	| expr DBLEQ expr { $$ = make_bin_expr("==", $1, $3, @2.first_column); }
+	| expr NEQ expr { $$ = make_bin_expr("!=", $1, $3, @2.first_column); }
+	| expr DBLAMP expr { $$ = make_bin_expr("&&", $1, $3, @2.first_column); }
+	| expr DBLPIPE expr { $$ = make_bin_expr("||", $1, $3, @2.first_column); }
+	| expr QMARK expr COLON expr { $$ = make_expr("?:", "\"operands\":[" + $1 + "," + $3 + "," + $5 + "]"); }
+	;
+
+opt_params:
+	LB params_seq RB { $$ = $2; }
+	| LB name_csl RB { $$ = $2; }
+	| LB RB { $$ = ""; }
+	;
+
+name_csl:
+	NAME { $$ = "\"" + $1 + "\""; }
+	| name_csl COMMA NAME {
+		$$ = $1 + ",\"" + $3 + "\"";
+	}
+	;
+	
+
+params_seq:
+	param 
+	| params_seq COMMA param { $$ = $1 + "," + $3 + ""; }
+	;
+
+param:
+	type NAME
+	{
+		$$ = "{\"type\":" + $1 + ",\"id\":\"" + $2 + "\"}";
+	}
+	;
+
+where_type: KW_RUSH { $$ = "\"rush\"";}
+	    | KW_STATIC { $$ = "\"static\"";}
+	    | KW_STATIC_FOR {$$ = "\"static_for\""; }
+	    | KW_UNROLLING {$$ = "\"unrolling\""; }
+	    ;
+
+%%
+
+extern int line_num;
+extern string line, prev_line;
+int init_num = 0;
+
+void add_header(const string &key, const string &value)
+{
+	headers.push_back("[\"" + key + "\", " + value + "]");
+}
+
+string replace(const string &src, const string &from, const string &to, size_t times) {
+	int len = from.size();
+	string res = src;
+	while ((res.find(from) != string::npos) && (times-- > 0)) {
+		int idx = res.find(from);
+		string left = res.substr(0, idx);
+		string right = res.substr(idx+len);
+		res = left + to + right;
+	}
+	return res;
+}
+
+void yyerror(const char* msg) {
+	cerr << "#ERROR: " << cur << ": " << msg << endl;
+	cerr << "ERROR (line " << line_num << "): " << msg << endl;
+	if (prev_line.empty() == false)
+		cerr << prev_line << endl;
+	cerr << line << "<-- here" << endl;
+	exit(1);
+}
+
+string shift(const string &s) {
+	if (s.empty()) {
+		return s;
+	}
+	string src = s;
+	ostringstream os;
+	if (src.find('\n') == string::npos) {
+		cerr << "ERROR: \\n in line'" << src << "'" << endl;
+	}
+	assert (src.find('\n') != string::npos);
+	while (!src.empty()) {
+		size_t idx = src.find('\n');
+		string line = src.substr(0, idx);
+		os << "  " << line << endl;
+		if (idx != string::npos) {
+			idx++;
+		}
+		src = src.substr(idx);
+	}
+	return os.str();
+}
+
+size_t last_auto_id = 1;
+string auto_id() {
+	ostringstream os;
+	os << "_autoid_" << (last_auto_id++);
+	return os.str();
+}
+
+string make_expr(const string &type, const string &body) {
+	ostringstream os;
+	os << "{" 
+		<< "\"type\": \"" << type << "\"";
+	if (!body.empty()) {
+		os << ", " << body;
+	}
+	os << "}";
+	return os.str();
+}
+
+string make_bin_expr(const string &type, const string &op1,
+	const string &op2, int op_pos) {
+	return make_expr(type, "\"operands\":[" + op1 + "," + op2 + "]"
+		+ ", \"op_pos\": " + std::to_string(op_pos));
+}
+
+string make_un_expr(const string &type, const string &op1,
+        int op_pos) {
+	return make_expr(type, "\"operands\":[" + op1 + "]"
+		+ ", \"op_pos\": " + std::to_string(op_pos));
+}

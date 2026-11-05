@@ -1,0 +1,17 @@
+import inc(in int, out int);
+import sum(in int, in int, out int);
+import mul(in int, in int, out int);
+
+sub mpi() {
+	inc(x1, y1);
+	inc(x2, y2);
+	sum(y1, y2, z1);
+	mul(y1, y2, z2);
+}
+
+interface "dclif" main (
+	"first" => int x1,
+	"second" => int x2,
+	"sum" <= int z1,
+	"mul" <= int z2
+) on mpi;

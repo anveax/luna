@@ -1,0 +1,75 @@
+#!/usr/bin/luna
+
+import c_read_opora(string, int, name, name, name, name, name);
+import c_calc_coeff(value, int, int, name, name, name);
+import c_calc_exps(int, int, name);
+import c_fft_i(value, value, int, int, name);
+
+import c_read_trace_list(name, name);
+import c_get_trace_file_name(value, int, int, name);
+import c_read_trace_file(value, int, value, name, name);
+
+import c_fft_multconj_rfft(value, value, value, int, int, name);
+import c_calc_output_trace(value, int, int, real, int, int, name, name, name);
+import c_save_trace(value, value, value, int, value, int, value);
+
+sub read(`in` int M, `in` name Fs, 
+            `out` name num_entries, `out` name X, `out` name X_meta,
+            `out` name check1,
+            `out` name file_names1)
+{
+    df file_names;
+    c_read_trace_list(file_names, num_entries) >> (check1[0]);
+    for i_f = 1 .. num_entries
+    {
+        if (check1[i_f - 1])
+        {
+            c_get_trace_file_name(file_names, i_f, num_entries, file_names1[i_f]);
+            c_read_trace_file(file_names1[i_f], M, Fs, X[i_f], X_meta[i_f]) >> (check1[i_f]);
+        }
+    }
+}
+
+sub corr(`in` name num_entries, 
+            `in` name X, `in` name S, 
+            `in` int M, `in` int p, `in` name L,
+            `out` name B, `out` name C, `out` name X2)
+{
+    df X1, A, a, b, W;
+
+    c_calc_coeff(S[0], M, L, a, b, A);
+
+    c_calc_exps(M, p, W);
+    c_fft_i(S[0], W, M, p, S[1]);
+
+    for j_f = 1 .. num_entries
+    {
+        c_fft_multconj_rfft(X[j_f], W, S[1], M, p, X1[j_f]);
+        c_calc_output_trace(X1[j_f], M, L, A, a, b, B[j_f], C[j_f], X2[j_f]);
+    }
+}
+
+sub main(string opora_dat, int arg3)
+{
+	df B, C,
+	    p, Fs, L, M,
+        X, X_meta, X2, S,
+        num_entries,
+        file_names1,
+        check1;
+
+    c_read_opora(opora_dat, arg3, Fs, L, p, M, S[0]);
+
+    read(M, Fs, num_entries, X, X_meta, check1, file_names1);
+
+    // wait for read to finish
+    if (check1[num_entries])
+    {
+        corr(num_entries, X, S, M, p, L, B, C, X2);
+
+        for j_f = 1 .. num_entries
+        {
+            c_save_trace(file_names1[j_f], B[j_f], C[j_f], L, X2[j_f], M, X_meta[j_f]);
+        }
+    }
+}

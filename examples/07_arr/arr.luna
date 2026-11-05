@@ -1,0 +1,15 @@
+// compute sum of all numbers from 1 to N
+
+import init(in int count, out blob numbers);
+import sum(in blob numbers, out int sum);
+
+sub arr(count, sum) {
+	name count, sum, arr;
+	init(count, arr);
+	sum(arr, sum);
+}
+
+interface "clif" main (
+	"string" => int count,
+	"string" <= int sum
+) on arr;

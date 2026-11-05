@@ -1,0 +1,26 @@
+#!/bin/bash
+
+JAZ="./main.jaz"
+
+set -e
+
+if [[ "$AZ" == "" ]]; then 
+	echo "\$AZ not set"
+	exit 1;
+fi
+
+if [[ "$BUILD_DIR" == "" ]]; then 
+	echo "\$BUILD_DIR not set"
+	exit 1;
+fi
+
+BD=$BUILD_DIR
+
+echo -en "1\n2\n" | node ../../bar/bari.js --iface=main main.jaz > $BD/out1
+echo -en "1\n2\n" | node ../../bar/bari.js --iface=main2 main.jaz > $BD/out2
+
+# verify output
+echo -e "4" > $BD/correct1
+echo -e "3" > $BD/correct2
+diff $BD/correct1 $BD/out1
+diff $BD/correct2 $BD/out2

@@ -1,0 +1,10 @@
+{
+	"type": "codefrag",
+	"format": "cpf",
+	"c_func_name": "init",
+	"params": [
+		{ "kind": "input", "format": "int32", "type": "int32" },
+		{ "kind": "output", "format": "string", "type": "string" }
+	],
+	"src": "../ucodes.c"
+}

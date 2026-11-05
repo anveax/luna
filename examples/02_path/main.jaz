@@ -1,0 +1,50 @@
+{
+	"iface": {
+		"main": {
+			"cm": "local://cm/main",
+			"format": "clif",
+			"params": [
+				{
+					"kind": "input",
+					"type": "int32",
+					"format": "string",
+					"target": "x1"
+				},
+				{
+					"kind": "input",
+					"type": "int32",
+					"format": "string",
+					"target": "x2"
+				},
+				{
+					"kind": "output",
+					"type": "int32",
+					"format": "path",
+					"source": "z"
+				}
+			]
+		}
+	},
+	"cm": {
+		"main": {
+			"names": {
+				"x1": {},
+				"x2": {},
+				"y": {},
+				"z": {}
+			},
+			"ops": {
+				"a": {
+					"type": "simple",
+					"code": "fs://./add",
+					"args": ["x1", "x2", "y"]
+				},
+				"b": {
+					"type": "simple",
+					"code": "fs://./inc",
+					"args": ["y", "z"]
+				}
+			}
+		}
+	}
+}

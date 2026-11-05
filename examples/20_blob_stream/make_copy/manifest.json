@@ -1,0 +1,10 @@
+{
+	"type": "codefrag",
+	"format": "cpf",
+	"c_func_name": "make_copy",
+	"params": [
+		{ "kind": "input", "format": "blob", "type": "blob" },
+		{ "kind": "output", "format": "blob", "type": "blob" }
+	],
+	"src": "./ucodes.c"
+}

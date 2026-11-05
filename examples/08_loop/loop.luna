@@ -1,0 +1,20 @@
+#!/usr/bin/env -S luna --parse
+
+// compute sum of all numbers
+
+#define N 10
+
+import add(out int, in int, in int);
+
+sub loop(first, sum) {
+	name first, sum, arr;
+	add(arr[0], 0, first);
+	for i=1..$N
+		add(arr[i], arr[i-1], i);
+	add(sum, arr[$N], 0);
+}
+
+interface "clif" main (
+	"string" => int first,
+	"string" <= int sum
+) on loop;

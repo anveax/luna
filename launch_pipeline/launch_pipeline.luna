@@ -1,0 +1,97 @@
+import pp(in blob, out blob);
+import parser(in blob, out blob);
+import ppjson(in blob, out blob);
+import unroll(in blob, out blob);
+import convert(in blob, out blob);
+import inject(in blob, in string, in string, out blob);
+import fetch_codes(in blob, out blob, out blob);
+import subst_consts(in blob, out blob);
+import obtain_plan(in blob, out blob);
+import gen_schedule(in blob, in int, out blob);
+import gen_codefrag(in blob, out blob);
+import gcc(in blob, in blob, out blob);
+import execute(in blob, in blob, out blob);
+import baz(in blob, in blob, out blob);
+import bar(in blob, in blob, out blob);
+import mpicc(in blob, in blob, out blob);
+import mpi_execute(in blob, in int, in blob, out blob);
+
+sub build_luna() {
+	name prog_luna, preprocessed, ja, json, unrolled, jaz,
+	    injected,
+	    fetched, cf_deps, noconst,
+	    plan,
+	    schedule,
+	    codefrag_c, codefrag_mpi,
+	    mpi_prog,
+	    res
+	    ;
+	pp(prog_luna, preprocessed);
+    parser(preprocessed, ja);
+    ppjson(ja, json);
+    unroll(json, unrolled);
+    convert(unrolled, jaz);
+
+    inject(jaz, ".base_dir", path_luna, injected);
+
+    fetch_codes(injected, fetched, cf_deps);
+    subst_consts(fetched, noconst);
+
+    //planners
+    obtain_plan(noconst, plan);
+
+    //schedulers
+    gen_schedule(plan, np, schedule);
+
+    //az
+    //generators
+    gen_codefrag(plan, codefrag_c);
+
+    //run
+    gcc(codefrag_c, cf_deps, codefrag);
+    execute(codefrag, input_data, output_data);
+
+    //mpi
+    //generators
+    gen_codefrag(schedule, codefrag_mpi);
+
+    //run
+    mpicc(codefrag_mpi, cf_deps, mpi_prog);
+    mpi_execute(mpi_prog, np, input_data_mpi, output_data_mpi);
+
+    //baz run
+    //baz(noconst, input_data, output_data);
+
+    //bar run
+    bar(noconst, input_data, output_data);
+}
+
+interface "clif" main (
+	"path" => blob prog_luna,
+	"string" => string path_luna,
+	"path" => blob input_data,
+	"path" <= blob output_data
+) on build_luna;
+
+interface "clif" jaz (
+    "path" => blob jaz,
+	"string" => string path_luna,
+	"path" => blob input_data,
+	"path" <= blob output_data
+) on build_luna;
+
+interface "clif" main_mpi (
+    "path" => blob prog_luna,
+	"string" => string path_luna,
+	"string" => int np,
+	"path" => blob input_data_mpi,
+	"path" <= blob output_data_mpi
+) on build_luna;
+
+interface "clif" jaz_mpi (
+    "path" => blob jaz,
+	"string" => string path_luna,
+	"string" => int np,
+	"path" => blob input_data_mpi,
+	"path" <= blob output_data_mpi
+) on build_luna;

@@ -1,0 +1,11 @@
+import make_copy (in blob, out blob copy);
+
+sub str() {
+	name data, copy;
+	make_copy(data, copy);
+}
+
+interface "clif" main (
+	"stdin" => blob data,
+	"stdout" <= blob copy
+) on str;

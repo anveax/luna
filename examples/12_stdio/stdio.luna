@@ -1,0 +1,15 @@
+// compute sum of all numbers from 1 to N
+
+import init (in int, out string);
+import sum (in string, out int sum);
+
+sub str(count, sum) {
+	name s, count, sum;
+	init(count, s);
+	sum(s, sum);
+}
+
+interface "clif" main (
+	"stdin" => int count,
+	"stdout" <= string s
+) on str;

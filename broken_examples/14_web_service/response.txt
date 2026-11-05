@@ -1,0 +1,15 @@
+#include <stddef.h>
+
+// dependencies
+void inc(int, int *);
+
+// wrappers
+
+
+void _cpf_auto_0(int _v0, int *_v1) {
+        // local vars
+
+
+        // invokes
+        inc(_v0, _v1);
+}

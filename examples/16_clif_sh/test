@@ -1,0 +1,75 @@
+#!/bin/bash
+
+INPUT="31\n23"
+OUTPUT="23"
+
+set -e
+
+if [[ "$AZ" == "" ]]; then 
+	echo "\$AZ not set"
+	exit 1;
+fi
+
+if [[ "$BUILD_DIR" == "" ]]; then 
+	echo "\$BUILD_DIR not set"
+	exit 1;
+fi
+
+BD=$BUILD_DIR
+FILE=`ls *.luna`
+
+echo -e "$INPUT" | $AZ/bin/luna $FILE > "$BD/result"
+
+# verify output
+echo -e "$OUTPUT" > $BD/correct
+diff $BD/correct $BD/result
+
+exit 0
+#echo -e "$INPUT" | $AZ/bin/luna $FILE > "$BD/result"
+
+# Preprocess
+$AZ/parser/pp.py $FILE -o $BD/preprocessed.pp
+
+# Parse grammar
+$AZ/bin/parser $BD/preprocessed.pp -o $BD/prog.ja
+
+# Pretty print json
+cat $BD/prog.ja | node $AZ/scripts/ppjson.js \
+	> $BD/prog.json
+
+# Unroll loops
+cat $BD/prog.json | node $AZ/scripts/unroll.js \
+	> $BD/unrolled.json
+
+JAZ=$BD/prog.jaz
+
+# Convert to jaz
+cat $BD/unrolled.json | node $AZ/scripts/convert.js > $JAZ
+
+# Subst consts
+cat $JAZ | node $AZ/scripts/subst_consts.js > $BD/noconst.jaz
+
+PLAN_JAZ=$BD/plan.jaz
+
+# planing
+cat $BD/noconst.jaz | node $AZ/scripts/obtain_plan.js > $PLAN_JAZ
+
+# generate CPF
+rm -rf $BD/codefrag
+echo -e "$BD/plan.jaz\n$BD/codefrag" | node $AZ/scripts/gen_codefrag.js
+
+# wrap into CLIF
+rm -rf $BD/wrapped
+echo -e "$BD/codefrag\n$BD/wrapped" | \
+	node $AZ/scripts/gen_clif_cpf_wrapper.js
+
+# build everything
+gcc -o $BD/a.out -I $AZ/src $AZ/src/clif.c $BD/codefrag/*.c \
+	$BD/wrapped/*.c $AZ/src/pipe.c $AZ/src/read_fd_lines.c
+
+# run
+echo -e "$INPUT" | $BD/a.out > $BD/result
+
+# verify output
+echo -e "$OUTPUT" > $BD/correct
+diff $BD/correct $BD/result

@@ -1,0 +1,24 @@
+#!/bin/bash
+
+set -e
+
+if [[ "$AZ" == "" ]]; then 
+	echo "\$AZ not set"
+	exit 1;
+fi
+
+if [[ "$BUILD_DIR" == "" ]]; then 
+	echo "\$BUILD_DIR not set"
+	exit 1;
+fi
+
+BD=$BUILD_DIR
+FILE=`ls *.luna`
+
+# reset mpi until the MPIGenerator is fixed
+MPIGEN=""
+
+cat test_data | $AZ/bin/luna $FILE > "$BD/result"
+
+# verify output
+diff test_data $BD/result

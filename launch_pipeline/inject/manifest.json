@@ -1,0 +1,28 @@
+{
+  "type": "codefrag",
+  "format": "clif",
+  "executable": "../../scripts/inject.js",
+  "exec_args": [],
+  "params": [
+    {
+      "kind": "input",
+      "format": "path",
+      "type": "blob"
+    },
+    {
+      "kind": "input",
+      "format": "string",
+      "type": "string"
+    },
+    {
+      "kind": "input",
+      "format": "string",
+      "type": "string"
+    },
+    {
+      "kind": "output",
+      "format": "path",
+      "type": "blob"
+    }
+  ]
+}

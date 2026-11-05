@@ -1,0 +1,18 @@
+{
+  "type": "codefrag",
+  "format": "clif",
+  "executable": "sleep.sh",
+  "exec_args": [],
+  "params": [
+    {
+      "kind": "input",
+      "format": "string",
+	  "type": "int32"
+    },
+    {
+      "kind": "output",
+      "format": "string",
+	  "type": "int32"
+    }
+  ]
+}

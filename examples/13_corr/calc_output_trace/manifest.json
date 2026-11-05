@@ -1,0 +1,16 @@
+{
+	"type": "codefrag",
+	"format": "cpf",
+	"c_func_name": "calc_output_trace",
+	"params": [
+		{ "kind": "input", "format": "blob", "type": "blob" },
+		{ "kind": "input", "format": "int32", "type": "int32" },
+		{ "kind": "input", "format": "real64", "type": "real64" },
+		{ "kind": "input", "format": "int32", "type": "int32" },
+		{ "kind": "input", "format": "int32", "type": "int32" },
+		{ "kind": "output", "format": "real64", "type": "real64" },
+		{ "kind": "output", "format": "real64", "type": "real64" },
+		{ "kind": "output", "format": "blob", "type": "blob" }
+	],
+	"src": ["../ucodes.c", "../fft2.c"]
+}

@@ -1,0 +1,17 @@
+{
+  "type": "codefrag",
+  "format": "clif",
+  "executable": "gen_codefrag.py",
+  "params": [
+    {
+      "kind": "input",
+      "format": "path",
+      "type": "blob"
+    },
+    {
+      "kind": "output",
+      "format": "path",
+      "type": "blob"
+    }
+  ]
+}

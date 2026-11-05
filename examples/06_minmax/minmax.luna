@@ -1,0 +1,14 @@
+import c_min(in int, in int, out int);
+import c_max(in int, in int, out int);
+
+sub minmax(a, b, min_, max_) {
+	c_min(a, b, min_);
+	c_max(a, b, max_);
+}
+
+interface "clif" main (
+	"string" => int a,
+	"string" => int b,
+	"string" <= int min_,
+	"string" <= int max_
+) on minmax;

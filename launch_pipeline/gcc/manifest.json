@@ -1,0 +1,22 @@
+{
+  "type": "codefrag",
+  "format": "clif",
+  "executable": "gcc.py",
+  "params": [
+    {
+      "kind": "input",
+      "format": "path",
+      "type": "blob"
+    },
+    {
+      "kind": "input",
+      "format": "path",
+      "type": "blob"
+    },
+    {
+      "kind": "output",
+      "format": "path",
+      "type": "blob"
+    }
+  ]
+}

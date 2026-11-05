@@ -1,0 +1,18 @@
+{
+  "type": "codefrag",
+  "format": "clif",
+  "executable": "dup.js",
+  "exec_args": [],
+  "params": [
+    {
+      "kind": "input",
+      "format": "path",
+	  "type": "blob"
+    },
+    {
+      "kind": "output",
+      "format": "path",
+	  "type": "blob"
+    }
+  ]
+}

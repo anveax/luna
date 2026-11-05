@@ -1,0 +1,23 @@
+{
+  "type": "codefrag",
+  "format": "clif",
+  "executable": "min.py",
+  "exec_args": [],
+  "params": [
+    {
+      "kind": "input",
+      "format": "string",
+	  "type": "int32"
+    },
+    {
+      "kind": "input",
+      "format": "string",
+	  "type": "int32"
+    },
+    {
+      "kind": "output",
+      "format": "string",
+	  "type": "int32"
+    }
+  ]
+}

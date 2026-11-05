@@ -1,0 +1,23 @@
+{
+  "type": "codefrag",
+  "format": "clif",
+  "executable": "../../scripts/fetch_codes.js",
+  "exec_args": [],
+  "params": [
+    {
+      "kind": "input",
+      "format": "path",
+      "type": "blob"
+    },
+    {
+      "kind": "output",
+      "format": "path",
+      "type": "blob"
+    },
+    {
+      "kind": "output",
+      "format": "path",
+      "type": "blob"
+    }
+  ]
+}
