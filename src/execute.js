@@ -66,6 +66,100 @@ function execute_cpf(sys_dir, code_path, args, value_provider, cb,
 	}
 }
 
+/*
+	cuef ("CUDA Element Format"): a __device__ function that computes one
+	element, see examples/24_cuef_vadd/readme.md.
+
+	Environment variables:
+		AZ_CUDA       -- "gpu" (default): compile with nvcc, run on the GPU;
+		                 "emulate": compile with g++, run in a loop on the CPU
+		NVCC          -- nvcc command (default "nvcc")
+		AZ_CUDA_ARCH  -- GPU architecture for nvcc -arch (default "native")
+
+	Any failure (generation, compilation, run) calls fail_cb, so that bar
+	can try an alternative operation, e.g. a CPU version of the fragment.
+*/
+function execute_cuef(sys_dir, code_path, args, value_provider, cb,
+		end_cb, fail_cb) {
+	assert(typeof end_cb === "function");
+	var mode = process.env.AZ_CUDA || 'gpu';
+	var temp_path = create_temp_dir();
+
+	function cleanup() {
+		fs.rmSync(temp_path, { recursive: true, force: true });
+	}
+
+	function fail(what, details) {
+		console.error(`[cuef] ${code_path}: ${what}`);
+		if (details)
+			console.error(details);
+		cleanup();
+		fail_cb();
+	}
+
+	if (mode !== 'gpu' && mode !== 'emulate')
+		return fail(`unknown AZ_CUDA="${mode}" (expected gpu or emulate)`);
+
+	var script_dir = path.dirname(__filename);
+	exec_cmd(['node', path.join(script_dir,
+		'../scripts/gen_clif_cuef_wrapper.js')],
+			`${code_path}\n${temp_path}\n${mode}\n`, (code, o, e) => {
+		if (code !== 0)
+			return fail("cannot generate the wrapper", e.toString());
+		compile_clif_c();
+	});
+
+	// clif.c is C, the wrapper is C++/CUDA: compile them separately
+	function compile_clif_c() {
+		exec_cmd(['gcc', '-c', '-I', `${sys_dir}/src`,
+			`${sys_dir}/src/clif.c`, '-o', `${temp_path}/clif.o`], '',
+				(code, o, e) => {
+			if (code !== 0)
+				return fail("cannot compile clif.c", e.toString());
+			compile_wrapper();
+		});
+	}
+
+	function compile_wrapper() {
+		var cmd;
+		if (mode === 'gpu') {
+			cmd = [process.env.NVCC || 'nvcc',
+				`-arch=${process.env.AZ_CUDA_ARCH || 'native'}`,
+				`${temp_path}/code.cu`];
+		} else {
+			cmd = ['g++', `${temp_path}/code.cpp`];
+		}
+		cmd = cmd.concat(['-I', `${sys_dir}/src`, `${temp_path}/clif.o`,
+			'-lm', '-o', `${temp_path}/a.out`]);
+
+		exec_cmd(cmd, '', (code, o, e) => {
+			if (code !== 0) {
+				if (e.toString().indexOf('ENOENT') !== -1)
+					return fail(`${cmd[0]} not found. Install the CUDA ` +
+						`Toolkit (nvcc must be in PATH) or set ` +
+						`AZ_CUDA=emulate to run on the CPU`);
+				return fail(`compilation failed (mode: ${mode})`,
+					e.toString());
+			}
+
+			var clif_mf_path = path.join(temp_path, 'manifest.json');
+			var clif_mf = JSON.parse(fs.readFileSync(clif_mf_path)
+				.toString());
+			clif_mf.executable = `${temp_path}/a.out`;
+			fs.writeFileSync(clif_mf_path,
+				JSON.stringify(clif_mf, null, 2));
+
+			execute_clif(temp_path, args, value_provider, cb, () => {
+				cleanup();
+				end_cb();
+			}, function() {
+				cleanup();
+				fail_cb.apply(null, arguments);
+			});
+		});
+	}
+}
+
 function execute_clif(code_path, args, value_provider, cb, cleanup_cb,
 		fail_cb) {
 	if (typeof fail_cb === "undefined")
@@ -240,6 +334,9 @@ function execute_raw(sys_dir, code_path, args, value_provider, cb,
 		case 'clif':
 			return execute_clif(code_path, args, value_provider, cb,
 				end_cb, fail_cb);
+		case 'cuef':
+			return execute_cuef(sys_dir, code_path, args,
+				value_provider, cb, end_cb, fail_cb);
 		default:
 			nimpl(manifest, manifest.format);
 	}

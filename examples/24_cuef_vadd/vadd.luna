@@ -1,0 +1,20 @@
+// Vector addition on the GPU: c = a + b, then s = sum(c).
+// fill and sum are ordinary C fragments (cpf),
+// vadd is a CUDA fragment (cuef).
+
+import fill(in int n, in int k, out blob arr);
+import vadd(in blob a, in blob b, out blob c);
+import sum(in blob arr, out real s);
+
+sub vector_add(n, s) {
+	name n, s, a, b, c;
+	fill(n, 1, a);
+	fill(n, 2, b);
+	vadd(a, b, c);
+	sum(c, s);
+}
+
+interface "clif" main (
+	"string" => int n,
+	"string" <= real s
+) on vector_add;

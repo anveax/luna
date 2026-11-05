@@ -1,0 +1,13 @@
+{
+	"type": "codefrag",
+	"format": "cuef",
+	"func_name": "vadd",
+	"params": [
+		{ "kind": "input", "format": "blob", "type": "blob", "elem": "real64" },
+		{ "kind": "input", "format": "blob", "type": "blob", "elem": "real64" },
+		{ "kind": "output", "format": "blob", "type": "blob", "elem": "real64",
+			"size_from": 0 }
+	],
+	"threads_from": 0,
+	"src": "./vadd.cu"
+}
