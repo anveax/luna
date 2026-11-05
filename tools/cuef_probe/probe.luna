@@ -1,0 +1,19 @@
+// Runs the diagnostic cuef fragment "probe" for n elements.
+
+import probe(in int n, in int delay_us,
+	out blob block, out blob thread, out blob sm,
+	out blob t_start, out blob t_end);
+
+sub run_probe(n, delay_us, block, thread, sm, t_start, t_end) {
+	probe(n, delay_us, block, thread, sm, t_start, t_end);
+}
+
+interface "clif" main (
+	"string" => int n,
+	"string" => int delay_us,
+	"path" <= blob block,
+	"path" <= blob thread,
+	"path" <= blob sm,
+	"path" <= blob t_start,
+	"path" <= blob t_end
+) on run_probe;

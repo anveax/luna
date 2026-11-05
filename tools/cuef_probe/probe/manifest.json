@@ -1,0 +1,21 @@
+{
+	"type": "codefrag",
+	"format": "cuef",
+	"func_name": "probe",
+	"params": [
+		{ "kind": "input", "format": "int32", "type": "int32" },
+		{ "kind": "input", "format": "int32", "type": "int32" },
+		{ "kind": "output", "format": "blob", "type": "blob", "elem": "int32",
+			"size_from": 0 },
+		{ "kind": "output", "format": "blob", "type": "blob", "elem": "int32",
+			"size_from": 0 },
+		{ "kind": "output", "format": "blob", "type": "blob", "elem": "int32",
+			"size_from": 0 },
+		{ "kind": "output", "format": "blob", "type": "blob", "elem": "real64",
+			"size_from": 0 },
+		{ "kind": "output", "format": "blob", "type": "blob", "elem": "real64",
+			"size_from": 0 }
+	],
+	"threads_from": 0,
+	"src": "./probe.cu"
+}
