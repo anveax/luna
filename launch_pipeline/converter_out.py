@@ -24,6 +24,8 @@ def main():
     with tempfile.TemporaryDirectory() as tmp_dir:
         target_dir = copy(tmp_dir)
         with tarfile.open(archive_path, "r:*") as tar:
+            # data filter: safe extraction and no DeprecationWarning (Python 3.12+)
+            tar.extraction_filter = getattr(tarfile, "data_filter", None)
             tar.extractall(tmp_dir)
 
             # получаем верхнюю директорию в архиве

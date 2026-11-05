@@ -24,6 +24,8 @@ def main():
     with tempfile.TemporaryDirectory() as tmp_dir:
         target_dir = copy(tmp_dir)
         with tarfile.open(archive_path, "r:*") as tar:
+            # data filter: safe extraction and no DeprecationWarning (Python 3.12+)
+            tar.extraction_filter = getattr(tarfile, "data_filter", None)
             tar.extractall(path=tmp_dir)
 
             # получаем верхнюю директорию в архиве
@@ -39,6 +41,8 @@ def main():
         input_dir = copy(tmp_dir)
 
         with tarfile.open(path_input, "r:*") as tar:
+            # data filter: safe extraction and no DeprecationWarning (Python 3.12+)
+            tar.extraction_filter = getattr(tarfile, "data_filter", None)
             tar.extractall(path=tmp_dir)
             # получаем верхнюю директорию в архиве
             members = tar.getmembers()
@@ -50,10 +54,18 @@ def main():
             else:
                 raise RuntimeError(f"В архиве несколько верхнеуровневых директорий: {top_dirs}")
 
+        # MPI_Init uses hwloc, whose gl component tries to connect to the
+        # local X server and prints "Authorization required, but no
+        # authorization protocol specified". It is not needed here, so it is
+        # disabled unless the user has set HWLOC_COMPONENTS.
+        env = dict(os.environ)
+        env.setdefault("HWLOC_COMPONENTS", "-gl")
+
         with tempfile.TemporaryDirectory() as output_dir:
             subprocess.run(
                 ['mpirun', '-np',  f'{np}', f'{AZ}/scripts/run_mpi.sh', f'--file={target_dir}/a.out', f'--input_dir={input_dir}', f'--output_dir={output_dir}'],
-                text=True
+                text=True,
+                env=env
             )
 
             with tarfile.open(path_output, "w") as tar:
