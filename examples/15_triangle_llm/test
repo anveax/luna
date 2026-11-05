@@ -25,4 +25,5 @@ echo -e "$INPUT" | $AZ/bin/luna $FILE > "$BD/result"
 
 # verify output
 echo -e "$OUTPUT" > $BD/correct
-cmp -n 16 $BD/correct $BD/result
+# compare the first 16 bytes only (`cmp -n` on macOS fails on files of different length)
+cmp <(head -c 16 "$BD/correct") <(head -c 16 "$BD/result")
