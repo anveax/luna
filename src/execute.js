@@ -134,10 +134,13 @@ function execute_cuef(sys_dir, code_path, args, value_provider, cb,
 
 		exec_cmd(cmd, '', (code, o, e) => {
 			if (code !== 0) {
-				if (e.toString().indexOf('ENOENT') !== -1)
+				if (e.toString().indexOf('ENOENT') !== -1 && mode === 'gpu')
 					return fail(`${cmd[0]} not found. Install the CUDA ` +
 						`Toolkit (nvcc must be in PATH) or set ` +
 						`AZ_CUDA=emulate to run on the CPU`);
+				if (e.toString().indexOf('ENOENT') !== -1)
+					return fail(`${cmd[0]} not found: a C++ compiler is ` +
+						`needed for AZ_CUDA=emulate`);
 				return fail(`compilation failed (mode: ${mode})`,
 					e.toString());
 			}

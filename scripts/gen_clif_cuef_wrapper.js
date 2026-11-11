@@ -195,10 +195,13 @@ function gen_wrapper(mf, mode, cuef_dir, stdin_idx) {
 				kparams.push(`${elem_ctype(idx)} *_p${idx}`);
 			kargs.push(`_p${idx}`);
 		});
+		// the index is computed in 64 bits: for n close to 2^31 the last
+		// block has threads with numbers that do not fit into int
 		out.push(`__global__ void _cuef_kernel(${kparams.join(', ')}) {`);
-		out.push(`\tint i = blockIdx.x * blockDim.x + threadIdx.x;`);
+		out.push(`\tlong long i = (long long)blockIdx.x * blockDim.x + ` +
+			`threadIdx.x;`);
 		out.push(`\tif (i < n)`);
-		out.push(`\t\t${name}(i, n, ${kargs.join(', ')});`);
+		out.push(`\t\t${name}((int)i, n, ${kargs.join(', ')});`);
 		out.push(`}`);
 		out.push(``);
 	}
@@ -281,7 +284,7 @@ function gen_wrapper(mf, mode, cuef_dir, stdin_idx) {
 		out.push(`\t// run one thread per element`);
 		out.push(`\tif (n > 0) {`);
 		out.push(`\t\tint _block = 256;`);
-		out.push(`\t\tint _grid = (n + _block - 1) / _block;`);
+		out.push(`\t\tint _grid = (int)(((long long)n + _block - 1) / _block);`);
 		out.push(`\t\t_cuef_kernel<<<_grid, _block>>>(n, ${args.join(', ')});`);
 		out.push(`\t\t_CUEF_CHECK(cudaGetLastError());`);
 		out.push(`\t\t_CUEF_CHECK(cudaDeviceSynchronize());`);

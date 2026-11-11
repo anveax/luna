@@ -73,3 +73,7 @@ starts, so it is part of the format.
 - With `AZ_CUDA=emulate` the same function is compiled by an ordinary C++
   compiler and called in a loop on the CPU. No GPU is needed, so this mode
   works on macOS as well. It checks everything except the GPU itself.
+  Code that uses features which exist only on the GPU (`threadIdx`,
+  `atomicAdd`, ...) does not compile in this mode.
+- Only the `bar` interpreter runs `cuef` fragments so far; the other
+  branches of the pipeline (gcc, MPI) do not support them yet.
