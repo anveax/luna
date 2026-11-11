@@ -3,9 +3,9 @@
 	"format": "cuef",
 	"func_name": "scale",
 	"params": [
-		{ "kind": "input", "format": "blob", "type": "blob", "elem": "real64" },
+		{ "kind": "input", "format": "real64_array", "type": "blob" },
 		{ "kind": "input", "format": "real64", "type": "real64" },
-		{ "kind": "output", "format": "blob", "type": "blob", "elem": "real64",
+		{ "kind": "output", "format": "real64_array", "type": "blob",
 			"size_from": 0 }
 	],
 	"threads_from": 0,

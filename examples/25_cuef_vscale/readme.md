@@ -9,9 +9,10 @@ __device__ void scale(int i, int n, const double *a, double k, double *c)
 ```
 
 In `scale/manifest.json` the scalar is an ordinary input parameter
-(`"type": "real64"`, no `elem`). It is passed to the generated kernel by
-value, so every thread gets the same `k` and no copy to the GPU is needed.
-Scalar inputs may be `int32` or `real64`; only outputs must be arrays.
+(`"format": "real64"`, `"type": "real64"`). It is passed to the generated
+kernel by value, so every thread gets the same `k` and no copy to the GPU
+is needed. Scalar inputs may be `int32` or `real64`; only outputs must be
+arrays (`int32_array` or `real64_array`).
 
 The constant can also be written in the program itself, for example
 `scale(a, 2.5, c);`.

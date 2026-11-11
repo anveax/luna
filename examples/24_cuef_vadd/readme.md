@@ -26,23 +26,28 @@ __device__ void <func_name>(int i, int n, <one argument per parameter>);
 - `n` is the number of elements (one GPU thread per element);
 - then one argument for each manifest parameter, in the same order:
 
-| `kind`   | `type`   | `elem`   | C argument        |
-|----------|----------|----------|-------------------|
-| `input`  | `int32`  | —        | `int`             |
-| `input`  | `real64` | —        | `double`          |
-| `input`  | `blob`   | `int32`  | `const int *`     |
-| `input`  | `blob`   | `real64` | `const double *`  |
-| `output` | `blob`   | `int32`  | `int *`           |
-| `output` | `blob`   | `real64` | `double *`        |
+| `format`       | `type`   | input argument     | output argument |
+|----------------|----------|--------------------|-----------------|
+| `int32`        | `int32`  | `int32_t`          | not allowed     |
+| `real64`       | `real64` | `double`           | not allowed     |
+| `int32_array`  | `blob`   | `const int32_t *`  | `int32_t *`     |
+| `real64_array` | `blob`   | `const double *`   | `double *`      |
+
+`int32_t` is the same type as `int` on the platforms CUDA supports.
+
+As in `cpf` and `clif`, `type` is the type of the value and `format` says
+how it is passed to the code. An array format is a `blob` whose bytes are
+elements of the given type. The system needs the element size to count
+the elements (threads) and to allocate the outputs before the kernel
+starts, so it is part of the format.
 
 ### Manifest fields
 
 - `format`: `"cuef"`;
 - `func_name`: the name of the `__device__` function;
-- `params`: as in `cpf`; every `blob` parameter also needs `elem`, the
-  type of its elements (`int32` or `real64`);
+- `params`: as in `cpf`, with the formats from the table above;
 - `threads_from`: the index of the input parameter that sets `n`. If that
-  parameter is a `blob`, `n` is its number of elements; if it is an
+  parameter is an array, `n` is its number of elements; if it is an
   `int32`, `n` is its value;
 - `size_from` (outputs only): the number of elements of the output array,
   by the same rule as `threads_from`;
@@ -51,7 +56,7 @@ __device__ void <func_name>(int i, int n, <one argument per parameter>);
 
 ### Rules
 
-- Outputs can only be arrays (`blob`). A single number cannot be written
+- Outputs can only be arrays. A single number cannot be written
   by many threads at once: compute it afterwards with another fragment
   (as `sum` does here).
 - Elements must be computed independently: the call for element `i`

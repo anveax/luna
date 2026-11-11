@@ -23,15 +23,27 @@ const { build_clif_params_scheme, ensure_dir_exists } =
 	require("../src/code_helpers.js");
 const { abort } = require("../src/common.js");
 
-const CTYPES = {
-	int32: 'int',
-	real64: 'double'
+// Parameter formats. As in cpf and clif, the format says how a value is
+// passed to the code, and the type is the type of the value. An array
+// format is a blob whose bytes are elements of the given C type: the
+// element size is needed to count the elements (threads) and to allocate
+// the outputs before the kernel starts.
+const FORMATS = {
+	int32:        { type: 'int32',  ctype: 'int32_t', array: false },
+	real64:       { type: 'real64', ctype: 'double',  array: false },
+	int32_array:  { type: 'blob',   ctype: 'int32_t', array: true },
+	real64_array: { type: 'blob',   ctype: 'double',  array: true }
 };
 
 const MODES = ['gpu', 'emulate'];
 
 function has(obj, key) {
 	return Object.prototype.hasOwnProperty.call(obj, key);
+}
+
+// format description of a parameter (checked by check_manifest)
+function fmt(param) {
+	return FORMATS[param.format];
 }
 
 function get_sources(mf) {
@@ -43,15 +55,15 @@ function get_sources(mf) {
 }
 
 // Checks that 'idx' is an input parameter which can define a number of
-// elements: a blob (its number of elements) or an int32 (its value).
+// elements: an array (its number of elements) or an int32 (its value).
 function check_count_source(mf, what, idx) {
 	var where = `cuef ${mf.func_name}: ${what}`;
 	if (!Number.isInteger(idx) || idx < 0 || idx >= mf.params.length)
 		abort(`${where} must be a parameter index`, idx);
 	var param = mf.params[idx];
-	if (param.kind !== 'input' ||
-			(param.type !== 'blob' && param.type !== 'int32'))
-		abort(`${where} must point to an input blob or int32 parameter`,
+	if (param.kind !== 'input' || !has(FORMATS, param.format) ||
+			(!fmt(param).array && param.format !== 'int32'))
+		abort(`${where} must point to an input array or int32 parameter`,
 			idx);
 }
 
@@ -68,19 +80,21 @@ function check_manifest(mf) {
 	var outputs = 0;
 	mf.params.forEach((param, idx) => {
 		var where = `cuef ${name}: parameter ${idx}`;
-		if (param.type === 'blob') {
-			if (!has(CTYPES, param.elem))
-				abort(`${where}: elem must be one of ` +
-					Object.keys(CTYPES).join(', '), param.elem);
-		} else if (!has(CTYPES, param.type)) {
-			abort(`${where}: type ${param.type} is not supported ` +
-				`(only int32, real64 and blob)`);
-		}
+		if (has(param, 'elem'))
+			abort(`${where}: "elem" is no longer used, the element type ` +
+				`is given by the format (int32_array or real64_array)`);
+		if (!has(FORMATS, param.format))
+			abort(`${where}: format must be one of ` +
+				Object.keys(FORMATS).join(', '), param.format);
+		if (param.type !== fmt(param).type)
+			abort(`${where}: format ${param.format} needs type ` +
+				`${fmt(param).type}`, param.type);
 
 		if (param.kind === 'output') {
 			outputs++;
-			if (param.type !== 'blob')
-				abort(`${where}: outputs must be blobs (arrays)`);
+			if (!fmt(param).array)
+				abort(`${where}: outputs must be arrays ` +
+					`(int32_array or real64_array)`);
 			check_count_source(mf, `parameter ${idx}: size_from`,
 				param.size_from);
 		} else if (param.kind !== 'input') {
@@ -100,7 +114,7 @@ function check_manifest(mf) {
 
 // C expression for the number of elements defined by parameter 'idx'
 function count_of(mf, idx) {
-	return mf.params[idx].type === 'blob' ? `_n${idx}` : `_v${idx}`;
+	return fmt(mf.params[idx]).array ? `_n${idx}` : `_v${idx}`;
 }
 
 function gen_wrapper(mf, mode, cuef_dir, stdin_idx) {
@@ -112,14 +126,14 @@ function gen_wrapper(mf, mode, cuef_dir, stdin_idx) {
 	function blobs(kind) {
 		var res = [];
 		params.forEach((p, idx) => {
-			if (p.type === 'blob' && (kind === undefined || p.kind === kind))
+			if (fmt(p).array && (kind === undefined || p.kind === kind))
 				res.push(idx);
 		});
 		return res;
 	}
 
 	function elem_ctype(idx) {
-		return CTYPES[params[idx].elem];
+		return fmt(params[idx]).ctype;
 	}
 
 	// parameters which define numbers of elements (threads, output sizes)
@@ -133,6 +147,7 @@ function gen_wrapper(mf, mode, cuef_dir, stdin_idx) {
 	out.push(`// CLIF wrapper over the cuef code fragment "${name}".`);
 	out.push(`#include <math.h>`);
 	out.push(`#include <stddef.h>`);
+	out.push(`#include <stdint.h>`);
 	out.push(`#include <stdio.h>`);
 	out.push(`#include <stdlib.h>`);
 	out.push(`extern "C" {`);
@@ -172,8 +187,8 @@ function gen_wrapper(mf, mode, cuef_dir, stdin_idx) {
 		var kparams = ['int n'];
 		var kargs = [];
 		params.forEach((p, idx) => {
-			if (p.type !== 'blob')
-				kparams.push(`${CTYPES[p.type]} _p${idx}`);
+			if (!fmt(p).array)
+				kparams.push(`${fmt(p).ctype} _p${idx}`);
 			else if (p.kind === 'input')
 				kparams.push(`const ${elem_ctype(idx)} *_p${idx}`);
 			else
@@ -198,8 +213,8 @@ function gen_wrapper(mf, mode, cuef_dir, stdin_idx) {
 		if (p.kind !== 'input')
 			return;
 		var line = `stdin_lines[${stdin_idx[idx]}]`;
-		if (p.type !== 'blob') {
-			out.push(`\t${CTYPES[p.type]} _v${idx} = parse_${p.type}(${line});`);
+		if (!fmt(p).array) {
+			out.push(`\t${fmt(p).ctype} _v${idx} = parse_${p.format}(${line});`);
 			return;
 		}
 		var et = elem_ctype(idx);
@@ -216,7 +231,7 @@ function gen_wrapper(mf, mode, cuef_dir, stdin_idx) {
 
 	// --- numbers of elements given by int32 parameters ---
 	count_sources.forEach(idx => {
-		if (params[idx].type !== 'int32')
+		if (params[idx].format !== 'int32')
 			return;
 		out.push(`\tif (_v${idx} < 0)`);
 		out.push(`\t\t_cuef_fail("parameter ${idx}: the number of ` +
@@ -262,7 +277,7 @@ function gen_wrapper(mf, mode, cuef_dir, stdin_idx) {
 		out.push(``);
 
 		var args = params.map((p, idx) =>
-			p.type === 'blob' ? `_d${idx}` : `_v${idx}`);
+			fmt(p).array ? `_d${idx}` : `_v${idx}`);
 		out.push(`\t// run one thread per element`);
 		out.push(`\tif (n > 0) {`);
 		out.push(`\t\tint _block = 256;`);
@@ -283,7 +298,7 @@ function gen_wrapper(mf, mode, cuef_dir, stdin_idx) {
 		});
 	} else {
 		var args = params.map((p, idx) => {
-			if (p.type !== 'blob')
+			if (!fmt(p).array)
 				return `_v${idx}`;
 			var et = elem_ctype(idx);
 			return p.kind === 'input' ? `(const ${et} *)_v${idx}`
@@ -335,7 +350,7 @@ var clif_mf = {
 	params: mf.params.map(p => ({
 		kind: p.kind,
 		type: p.type,
-		format: p.type === 'blob' ? 'path' : 'string'
+		format: fmt(p).array ? 'path' : 'string'
 	})),
 	src: mode === 'gpu' ? 'code.cu' : 'code.cpp'
 };
