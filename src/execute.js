@@ -67,19 +67,23 @@ function execute_cpf(sys_dir, code_path, args, value_provider, cb,
 }
 
 /*
+	CUDA code fragments:
 	cuef ("CUDA Element Format"): a __device__ function that computes one
-	element, see examples/24_cuef_vadd/readme.md.
+		element, see examples/24_cuef_vadd/readme.md;
+	cukf ("CUDA Kernel Format"): a __global__ kernel written by the user,
+		see examples/26_cukf_sum/readme.md. It runs only on the GPU.
 
 	Environment variables:
 		AZ_CUDA       -- "gpu" (default): compile with nvcc, run on the GPU;
-		                 "emulate": compile with g++, run in a loop on the CPU
+		                 "emulate": compile cuef with g++, run in a loop on
+		                 the CPU (cukf fragments then fail)
 		NVCC          -- nvcc command (default "nvcc")
 		AZ_CUDA_ARCH  -- GPU architecture for nvcc -arch (default "native")
 
 	Any failure (generation, compilation, run) calls fail_cb, so that bar
 	can try an alternative operation, e.g. a CPU version of the fragment.
 */
-function execute_cuef(sys_dir, code_path, args, value_provider, cb,
+function execute_cuda(sys_dir, format, code_path, args, value_provider, cb,
 		end_cb, fail_cb) {
 	assert(typeof end_cb === "function");
 	var mode = process.env.AZ_CUDA || 'gpu';
@@ -90,7 +94,7 @@ function execute_cuef(sys_dir, code_path, args, value_provider, cb,
 	}
 
 	function fail(what, details) {
-		console.error(`[cuef] ${code_path}: ${what}`);
+		console.error(`[${format}] ${code_path}: ${what}`);
 		if (details)
 			console.error(details);
 		cleanup();
@@ -99,10 +103,13 @@ function execute_cuef(sys_dir, code_path, args, value_provider, cb,
 
 	if (mode !== 'gpu' && mode !== 'emulate')
 		return fail(`unknown AZ_CUDA="${mode}" (expected gpu or emulate)`);
+	if (format === 'cukf' && mode !== 'gpu')
+		return fail(`cukf fragments run only on the GPU ` +
+			`(AZ_CUDA=${mode} is not supported)`);
 
 	var script_dir = path.dirname(__filename);
 	exec_cmd(['node', path.join(script_dir,
-		'../scripts/gen_clif_cuef_wrapper.js')],
+		'../scripts/gen_clif_cuda_wrapper.js')],
 			`${code_path}\n${temp_path}\n${mode}\n`, (code, o, e) => {
 		if (code !== 0)
 			return fail("cannot generate the wrapper", e.toString());
@@ -136,8 +143,9 @@ function execute_cuef(sys_dir, code_path, args, value_provider, cb,
 			if (code !== 0) {
 				if (e.toString().indexOf('ENOENT') !== -1 && mode === 'gpu')
 					return fail(`${cmd[0]} not found. Install the CUDA ` +
-						`Toolkit (nvcc must be in PATH) or set ` +
-						`AZ_CUDA=emulate to run on the CPU`);
+						`Toolkit (nvcc must be in PATH)` +
+						(format === 'cuef' ? ` or set AZ_CUDA=emulate ` +
+							`to run on the CPU` : ``));
 				if (e.toString().indexOf('ENOENT') !== -1)
 					return fail(`${cmd[0]} not found: a C++ compiler is ` +
 						`needed for AZ_CUDA=emulate`);
@@ -338,7 +346,8 @@ function execute_raw(sys_dir, code_path, args, value_provider, cb,
 			return execute_clif(code_path, args, value_provider, cb,
 				end_cb, fail_cb);
 		case 'cuef':
-			return execute_cuef(sys_dir, code_path, args,
+		case 'cukf':
+			return execute_cuda(sys_dir, manifest.format, code_path, args,
 				value_provider, cb, end_cb, fail_cb);
 		default:
 			nimpl(manifest, manifest.format);

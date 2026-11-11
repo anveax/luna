@@ -1,0 +1,16 @@
+// Sum of an array on the GPU: a[i] = i, s = sum(a).
+// fill is an ordinary C fragment (cpf), sum is a CUDA kernel (cukf).
+
+import fill(in int n, in int k, out blob arr);
+import sum(in blob arr, out real s);
+
+sub array_sum(n, s) {
+	name n, s, a;
+	fill(n, 1, a);
+	sum(a, s);
+}
+
+interface "clif" main (
+	"string" => int n,
+	"string" <= real s
+) on array_sum;

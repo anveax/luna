@@ -1,0 +1,33 @@
+#!/bin/bash
+
+# a[i] = i, s = sum(a) = n * (n - 1) / 2
+# 100000 elements: 391 blocks of 256 threads, the last one is not full
+INPUT="100000"
+OUTPUT="4999950000"
+
+set -e
+
+if [[ "$AZ" == "" ]]; then
+	echo "\$AZ not set"
+	exit 1;
+fi
+
+if [[ "$BUILD_DIR" == "" ]]; then
+	echo "\$BUILD_DIR not set"
+	exit 1;
+fi
+
+# cukf fragments run only on the GPU
+if [[ "$AZ_CUDA" == "emulate" ]]; then
+	echo -n " (skipped: needs a GPU)"
+	exit 0
+fi
+
+BD=$BUILD_DIR
+FILE=`ls *.luna`
+
+echo -e "$INPUT" | $AZ/bin/luna $FILE > "$BD/result"
+
+# verify output
+echo -e "$OUTPUT" > $BD/correct
+diff $BD/correct $BD/result

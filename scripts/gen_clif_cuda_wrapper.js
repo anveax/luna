@@ -2,18 +2,24 @@
 
 /*
 CLIF
-	in path cuef     -- directory of a cuef code fragment
+	in path frag     -- directory of a cuef or cukf code fragment
 	in path clif     -- directory for the generated CLIF code fragment
-	in string mode   -- "gpu" (default) or "emulate"
+	in string mode   -- "gpu" (default) or "emulate" (cuef only)
 
-Generates a CLIF wrapper over a cuef code fragment ("CUDA Element Format":
-a __device__ function that computes one element of the result, see
-examples/24_cuef_vadd/readme.md).
+Generates a CLIF wrapper over a CUDA code fragment:
 
-mode "gpu": code.cu for nvcc. It copies the inputs to the GPU, launches one
-	thread per element, checks for errors and copies the outputs back.
-mode "emulate": code.cpp for an ordinary C++ compiler. It calls the same
-	function in a loop on the CPU, so no GPU is needed.
+cuef ("CUDA Element Format"): a __device__ function that computes one
+	element of the result, see examples/24_cuef_vadd/readme.md. The wrapper
+	contains a kernel that calls this function, one thread per element.
+cukf ("CUDA Kernel Format"): a __global__ kernel written by the user, see
+	examples/26_cukf_sum/readme.md. The wrapper launches this kernel.
+
+In both cases the wrapper reads the inputs, copies them to the GPU, launches
+the kernel, checks for errors, copies the outputs back and writes them.
+
+mode "gpu": code.cu for nvcc.
+mode "emulate" (cuef only): code.cpp for an ordinary C++ compiler. It calls
+	the cuef function in a loop on the CPU, so no GPU is needed.
 */
 
 const fs = require('fs');
@@ -37,6 +43,9 @@ const FORMATS = {
 
 const MODES = ['gpu', 'emulate'];
 
+const DEFAULT_BLOCK_SIZE = 256;
+const MAX_BLOCK_SIZE = 1024;
+
 function has(obj, key) {
 	return Object.prototype.hasOwnProperty.call(obj, key);
 }
@@ -57,7 +66,7 @@ function get_sources(mf) {
 // Checks that 'idx' is an input parameter which can define a number of
 // elements: an array (its number of elements) or an int32 (its value).
 function check_count_source(mf, what, idx) {
-	var where = `cuef ${mf.func_name}: ${what}`;
+	var where = `${mf.format} ${mf.func_name}: ${what}`;
 	if (!Number.isInteger(idx) || idx < 0 || idx >= mf.params.length)
 		abort(`${where} must be a parameter index`, idx);
 	var param = mf.params[idx];
@@ -67,19 +76,25 @@ function check_count_source(mf, what, idx) {
 			idx);
 }
 
-function check_manifest(mf) {
-	if (mf.format !== 'cuef')
-		abort("not a cuef code fragment", mf.format);
+function check_manifest(mf, mode) {
+	if (mf.format !== 'cuef' && mf.format !== 'cukf')
+		abort("not a CUDA code fragment (expected format cuef or cukf)",
+			mf.format);
+	var cukf = (mf.format === 'cukf');
 	if (typeof mf.func_name !== 'string' ||
 			!/^[A-Za-z_][A-Za-z0-9_]*$/.test(mf.func_name))
-		abort("cuef: func_name must be a C identifier", mf.func_name);
-	var name = mf.func_name;
+		abort(`${mf.format}: func_name must be a C identifier`,
+			mf.func_name);
+	var name = `${mf.format} ${mf.func_name}`;
+	if (cukf && mode !== 'gpu')
+		abort(`${name}: cukf fragments run only on the GPU ` +
+			`(mode "${mode}" is not supported)`);
 	if (!Array.isArray(mf.params) || mf.params.length === 0)
-		abort(`cuef ${name}: params must be a non-empty list`);
+		abort(`${name}: params must be a non-empty list`);
 
 	var outputs = 0;
 	mf.params.forEach((param, idx) => {
-		var where = `cuef ${name}: parameter ${idx}`;
+		var where = `${name}: parameter ${idx}`;
 		if (has(param, 'elem'))
 			abort(`${where}: "elem" is no longer used, the element type ` +
 				`is given by the format (int32_array or real64_array)`);
@@ -92,24 +107,36 @@ function check_manifest(mf) {
 
 		if (param.kind === 'output') {
 			outputs++;
-			if (!fmt(param).array)
+			if (fmt(param).array) {
+				check_count_source(mf, `parameter ${idx}: size_from`,
+					param.size_from);
+			} else if (!cukf) {
 				abort(`${where}: outputs must be arrays ` +
 					`(int32_array or real64_array)`);
-			check_count_source(mf, `parameter ${idx}: size_from`,
-				param.size_from);
+			} else if (has(param, 'size_from')) {
+				abort(`${where}: size_from is only for output arrays`);
+			}
 		} else if (param.kind !== 'input') {
 			abort(`${where}: unknown kind`, param.kind);
 		}
 	});
 	if (outputs === 0)
-		abort(`cuef ${name}: at least one output is required`);
+		abort(`${name}: at least one output is required`);
 
 	check_count_source(mf, 'threads_from', mf.threads_from);
 
+	if (has(mf, 'block_size')) {
+		if (!cukf)
+			abort(`${name}: block_size is only for cukf fragments`);
+		if (!Number.isInteger(mf.block_size) || mf.block_size < 1 ||
+				mf.block_size > MAX_BLOCK_SIZE)
+			abort(`${name}: block_size must be an integer from 1 to ` +
+				`${MAX_BLOCK_SIZE}`, mf.block_size);
+	}
+
 	var sources = get_sources(mf);
 	if (sources.length === 0 || sources.some(s => typeof s !== 'string'))
-		abort(`cuef ${name}: src must be a file name or a list of ` +
-			`file names`);
+		abort(`${name}: src must be a file name or a list of file names`);
 }
 
 // C expression for the number of elements defined by parameter 'idx'
@@ -117,13 +144,16 @@ function count_of(mf, idx) {
 	return fmt(mf.params[idx]).array ? `_n${idx}` : `_v${idx}`;
 }
 
-function gen_wrapper(mf, mode, cuef_dir, stdin_idx) {
+function gen_wrapper(mf, mode, frag_dir, stdin_idx) {
 	var name = mf.func_name;
+	var cukf = (mf.format === 'cukf');
+	var what = `${mf.format} ${name}`; // prefix of error messages
 	var gpu = (mode === 'gpu');
 	var params = mf.params;
 	var out = [];
 
-	function blobs(kind) {
+	// indices of array parameters (of the given kind, if any)
+	function arrays(kind) {
 		var res = [];
 		params.forEach((p, idx) => {
 			if (fmt(p).array && (kind === undefined || p.kind === kind))
@@ -132,19 +162,39 @@ function gen_wrapper(mf, mode, cuef_dir, stdin_idx) {
 		return res;
 	}
 
+	// indices of output numbers (cukf only)
+	function scalar_outputs() {
+		var res = [];
+		params.forEach((p, idx) => {
+			if (!fmt(p).array && p.kind === 'output')
+				res.push(idx);
+		});
+		return res;
+	}
+
+	// C type of a kernel parameter for parameter 'p'
+	function kernel_ctype(p) {
+		if (p.kind === 'output')
+			return `${fmt(p).ctype} *`;
+		if (fmt(p).array)
+			return `const ${fmt(p).ctype} *`;
+		return fmt(p).ctype;
+	}
+
 	function elem_ctype(idx) {
 		return fmt(params[idx]).ctype;
 	}
 
 	// parameters which define numbers of elements (threads, output sizes)
 	var count_sources = [mf.threads_from];
-	blobs('output').forEach(idx => count_sources.push(params[idx].size_from));
+	arrays('output').forEach(idx => count_sources.push(params[idx].size_from));
 	count_sources = count_sources.filter((idx, k) =>
 		count_sources.indexOf(idx) === k);
 
 	// --- header ---
-	out.push(`// Generated by scripts/gen_clif_cuef_wrapper.js (mode: ${mode}).`);
-	out.push(`// CLIF wrapper over the cuef code fragment "${name}".`);
+	out.push(`// Generated by scripts/gen_clif_cuda_wrapper.js ` +
+		`(format: ${mf.format}, mode: ${mode}).`);
+	out.push(`// CLIF wrapper over the ${mf.format} code fragment "${name}".`);
 	out.push(`#include <math.h>`);
 	out.push(`#include <stddef.h>`);
 	out.push(`#include <stdint.h>`);
@@ -161,42 +211,46 @@ function gen_wrapper(mf, mode, cuef_dir, stdin_idx) {
 		out.push(`#define __forceinline__ inline`);
 		out.push(``);
 	}
+	if (cukf) {
+		out.push(`// threads per block (manifest field block_size)`);
+		out.push(`#define CUKF_BLOCK_SIZE ` +
+			`${mf.block_size || DEFAULT_BLOCK_SIZE}`);
+		out.push(``);
+	}
 	out.push(`// The user code`);
 	get_sources(mf).forEach(src => {
-		out.push(`#include ${JSON.stringify(path.resolve(cuef_dir, src))}`);
+		out.push(`#include ${JSON.stringify(path.resolve(frag_dir, src))}`);
 	});
 	out.push(``);
-	out.push(`static void _cuef_fail(const char *what) {`);
-	out.push(`\tfprintf(stderr, "cuef ${name}: %s\\n", what);`);
+	out.push(`static void _wrap_fail(const char *what) {`);
+	out.push(`\tfprintf(stderr, "${what}: %s\\n", what);`);
 	out.push(`\texit(1);`);
 	out.push(`}`);
 	out.push(``);
 
 	if (gpu) {
-		out.push(String.raw`#define _CUEF_CHECK(call) do { \
+		out.push(String.raw`#define _WRAP_CHECK(call) do { \
 	cudaError_t _err = (call); \
 	if (_err != cudaSuccess) { \
-		fprintf(stderr, "cuef ${name}: %s: %s\n", #call, \
+		fprintf(stderr, "${what}: %s: %s\n", #call, \
 			cudaGetErrorString(_err)); \
 		exit(1); \
 	} \
 } while (0)`);
 		out.push(``);
+	}
 
-		// kernel: one thread per element
+	if (gpu && !cukf) {
+		// cuef kernel: one thread per element. The index is computed in
+		// 64 bits: for n close to 2^31 the last block has threads with
+		// numbers that do not fit into int.
 		var kparams = ['int n'];
 		var kargs = [];
 		params.forEach((p, idx) => {
-			if (!fmt(p).array)
-				kparams.push(`${fmt(p).ctype} _p${idx}`);
-			else if (p.kind === 'input')
-				kparams.push(`const ${elem_ctype(idx)} *_p${idx}`);
-			else
-				kparams.push(`${elem_ctype(idx)} *_p${idx}`);
+			var t = kernel_ctype(p);
+			kparams.push(t.endsWith('*') ? `${t}_p${idx}` : `${t} _p${idx}`);
 			kargs.push(`_p${idx}`);
 		});
-		// the index is computed in 64 bits: for n close to 2^31 the last
-		// block has threads with numbers that do not fit into int
 		out.push(`__global__ void _cuef_kernel(${kparams.join(', ')}) {`);
 		out.push(`\tlong long i = (long long)blockIdx.x * blockDim.x + ` +
 			`threadIdx.x;`);
@@ -225,7 +279,7 @@ function gen_wrapper(mf, mode, cuef_dir, stdin_idx) {
 		out.push(`\tsize_t _v${idx}_size;`);
 		out.push(`\tread_path_blob(${line}, &_v${idx}, &_v${idx}_size);`);
 		out.push(`\tif (_v${idx}_size % sizeof(${et}) != 0)`);
-		out.push(`\t\t_cuef_fail("parameter ${idx}: the array size is ` +
+		out.push(`\t\t_wrap_fail("parameter ${idx}: the array size is ` +
 			`not a multiple of the element size");`);
 		if (count_sources.indexOf(idx) !== -1)
 			out.push(`\tsize_t _n${idx} = _v${idx}_size / sizeof(${et});`);
@@ -237,21 +291,21 @@ function gen_wrapper(mf, mode, cuef_dir, stdin_idx) {
 		if (params[idx].format !== 'int32')
 			return;
 		out.push(`\tif (_v${idx} < 0)`);
-		out.push(`\t\t_cuef_fail("parameter ${idx}: the number of ` +
+		out.push(`\t\t_wrap_fail("parameter ${idx}: the number of ` +
 			`elements is negative");`);
 	});
 
 	// --- number of threads ---
-	out.push(`\t// number of elements (one thread per element)`);
+	out.push(`\t// number of elements (threads)`);
 	out.push(`\tsize_t _n = (size_t)${count_of(mf, mf.threads_from)};`);
 	out.push(`\tif (_n > 2147483647u)`);
-	out.push(`\t\t_cuef_fail("too many elements");`);
+	out.push(`\t\t_wrap_fail("too many elements");`);
 	out.push(`\tint n = (int)_n;`);
 	out.push(``);
 
 	// --- allocate outputs (filled with zeros) ---
 	out.push(`\t// allocate outputs`);
-	blobs('output').forEach(idx => {
+	arrays('output').forEach(idx => {
 		var et = elem_ctype(idx);
 		out.push(`\tsize_t _n${idx} = (size_t)` +
 			`${count_of(mf, params[idx].size_from)};`);
@@ -259,45 +313,77 @@ function gen_wrapper(mf, mode, cuef_dir, stdin_idx) {
 		out.push(`\tvoid *_v${idx} = calloc(_n${idx} ? _n${idx} : 1, ` +
 			`sizeof(${et}));`);
 		out.push(`\tif (_v${idx} == NULL)`);
-		out.push(`\t\t_cuef_fail("out of memory");`);
+		out.push(`\t\t_wrap_fail("out of memory");`);
+	});
+	scalar_outputs().forEach(idx => {
+		out.push(`\t${elem_ctype(idx)} _v${idx} = 0;`);
 	});
 	out.push(``);
 
 	if (gpu) {
 		out.push(`\t// copy inputs to the GPU, allocate outputs there`);
-		blobs().forEach(idx => {
+		arrays().forEach(idx => {
 			var et = elem_ctype(idx);
 			var size = `_v${idx}_size`;
 			out.push(`\t${et} *_d${idx};`);
-			out.push(`\t_CUEF_CHECK(cudaMalloc((void **)&_d${idx}, ` +
+			out.push(`\t_WRAP_CHECK(cudaMalloc((void **)&_d${idx}, ` +
 				`${size} ? ${size} : 1));`);
 			if (params[idx].kind === 'input')
-				out.push(`\t_CUEF_CHECK(cudaMemcpy(_d${idx}, _v${idx}, ` +
+				out.push(`\t_WRAP_CHECK(cudaMemcpy(_d${idx}, _v${idx}, ` +
 					`${size}, cudaMemcpyHostToDevice));`);
 			else
-				out.push(`\t_CUEF_CHECK(cudaMemset(_d${idx}, 0, ${size}));`);
+				out.push(`\t_WRAP_CHECK(cudaMemset(_d${idx}, 0, ${size}));`);
+		});
+		scalar_outputs().forEach(idx => {
+			var et = elem_ctype(idx);
+			out.push(`\t${et} *_d${idx};`);
+			out.push(`\t_WRAP_CHECK(cudaMalloc((void **)&_d${idx}, ` +
+				`sizeof(${et})));`);
+			out.push(`\t_WRAP_CHECK(cudaMemset(_d${idx}, 0, ` +
+				`sizeof(${et})));`);
 		});
 		out.push(``);
 
+		// arrays and output numbers are in GPU memory, input numbers are
+		// passed by value
 		var args = params.map((p, idx) =>
-			fmt(p).array ? `_d${idx}` : `_v${idx}`);
-		out.push(`\t// run one thread per element`);
+			(fmt(p).array || p.kind === 'output') ? `_d${idx}` : `_v${idx}`);
+		var kernel, block;
+		if (cukf) {
+			out.push(`\t// the kernel must have exactly the signature ` +
+				`given by the manifest`);
+			var sig = ['int'].concat(params.map(p => kernel_ctype(p).trim()));
+			out.push(`\tvoid (*_signature)(${sig.join(', ')}) = ${name};`);
+			out.push(`\t(void)_signature;`);
+			out.push(``);
+			out.push(`\t// launch the kernel`);
+			kernel = name;
+			block = 'CUKF_BLOCK_SIZE';
+		} else {
+			out.push(`\t// run one thread per element`);
+			kernel = '_cuef_kernel';
+			block = `${DEFAULT_BLOCK_SIZE}`;
+		}
 		out.push(`\tif (n > 0) {`);
-		out.push(`\t\tint _block = 256;`);
+		out.push(`\t\tint _block = ${block};`);
 		out.push(`\t\tint _grid = (int)(((long long)n + _block - 1) / _block);`);
-		out.push(`\t\t_cuef_kernel<<<_grid, _block>>>(n, ${args.join(', ')});`);
-		out.push(`\t\t_CUEF_CHECK(cudaGetLastError());`);
-		out.push(`\t\t_CUEF_CHECK(cudaDeviceSynchronize());`);
+		out.push(`\t\t${kernel}<<<_grid, _block>>>(n, ${args.join(', ')});`);
+		out.push(`\t\t_WRAP_CHECK(cudaGetLastError());`);
+		out.push(`\t\t_WRAP_CHECK(cudaDeviceSynchronize());`);
 		out.push(`\t}`);
 		out.push(``);
 
 		out.push(`\t// copy outputs back, free GPU memory`);
-		blobs('output').forEach(idx => {
-			out.push(`\t_CUEF_CHECK(cudaMemcpy(_v${idx}, _d${idx}, ` +
+		arrays('output').forEach(idx => {
+			out.push(`\t_WRAP_CHECK(cudaMemcpy(_v${idx}, _d${idx}, ` +
 				`_v${idx}_size, cudaMemcpyDeviceToHost));`);
 		});
-		blobs().forEach(idx => {
-			out.push(`\t_CUEF_CHECK(cudaFree(_d${idx}));`);
+		scalar_outputs().forEach(idx => {
+			out.push(`\t_WRAP_CHECK(cudaMemcpy(&_v${idx}, _d${idx}, ` +
+				`sizeof(${elem_ctype(idx)}), cudaMemcpyDeviceToHost));`);
+		});
+		arrays().concat(scalar_outputs()).forEach(idx => {
+			out.push(`\t_WRAP_CHECK(cudaFree(_d${idx}));`);
 		});
 	} else {
 		var args = params.map((p, idx) => {
@@ -314,13 +400,20 @@ function gen_wrapper(mf, mode, cuef_dir, stdin_idx) {
 	out.push(``);
 
 	// --- write outputs, free memory ---
+	// arrays go to files; numbers go to stdout, one line each, in the
+	// order of the parameters
 	out.push(`\t// write outputs`);
-	blobs('output').forEach(idx => {
-		out.push(`\twrite_path_blob(stdin_lines[${stdin_idx[idx]}], ` +
-			`_v${idx}, _v${idx}_size);`);
+	params.forEach((p, idx) => {
+		if (p.kind !== 'output')
+			return;
+		if (fmt(p).array)
+			out.push(`\twrite_path_blob(stdin_lines[${stdin_idx[idx]}], ` +
+				`_v${idx}, _v${idx}_size);`);
+		else
+			out.push(`\twrite_line_${p.format}(_v${idx});`);
 	});
 	out.push(``);
-	blobs().forEach(idx => out.push(`\tfree(_v${idx});`));
+	arrays().forEach(idx => out.push(`\tfree(_v${idx});`));
 	out.push(`\tfree((void *)stdin_lines[0]);`);
 	out.push(`\tfree((void *)stdin_lines);`);
 	out.push(`\treturn 0;`);
@@ -334,19 +427,20 @@ function gen_wrapper(mf, mode, cuef_dir, stdin_idx) {
 
 var lines = fs.readFileSync(0, "utf-8").split('\n');
 if (!lines[0] || !lines[1])
-	abort("usage: printf 'CUEF_DIR\\nOUT_DIR\\n[gpu|emulate]\\n' | " +
-		"node gen_clif_cuef_wrapper.js");
-var cuef_dir = path.resolve(lines[0]);
+	abort("usage: printf 'FRAG_DIR\\nOUT_DIR\\n[gpu|emulate]\\n' | " +
+		"node gen_clif_cuda_wrapper.js");
+var frag_dir = path.resolve(lines[0]);
 var clif_dir = lines[1];
 var mode = lines[2] || 'gpu';
 if (MODES.indexOf(mode) === -1)
-	abort("cuef: unknown mode (expected gpu or emulate)", mode);
+	abort("unknown mode (expected gpu or emulate)", mode);
 
-var mf = JSON.parse(fs.readFileSync(path.join(cuef_dir, 'manifest.json')));
-check_manifest(mf);
+var mf = JSON.parse(fs.readFileSync(path.join(frag_dir, 'manifest.json')));
+check_manifest(mf, mode);
 
-// Every cuef parameter takes one stdin line in the CLIF wrapper:
-// numbers are passed as strings, arrays as paths to files.
+// The CLIF wrapper takes input numbers as stdin lines, arrays (inputs and
+// outputs) as paths to files in stdin lines, and writes output numbers to
+// stdout.
 var clif_mf = {
 	type: 'codefrag',
 	format: 'clif',
@@ -364,11 +458,12 @@ var stdin_idx = {};
 	stdin_idx[param_idx] = line_idx;
 });
 mf.params.forEach((p, idx) => {
-	if (!has(stdin_idx, idx))
-		abort(`cuef ${mf.func_name}: parameter ${idx} has no stdin line`);
+	if ((p.kind === 'input' || fmt(p).array) && !has(stdin_idx, idx))
+		abort(`${mf.format} ${mf.func_name}: parameter ${idx} has no ` +
+			`stdin line`);
 });
 
-var code = gen_wrapper(mf, mode, cuef_dir, stdin_idx);
+var code = gen_wrapper(mf, mode, frag_dir, stdin_idx);
 
 ensure_dir_exists(clif_dir);
 fs.writeFileSync(path.join(clif_dir, clif_mf.src), code, 'utf-8');

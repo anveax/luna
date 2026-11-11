@@ -1,0 +1,12 @@
+{
+	"type": "codefrag",
+	"format": "cukf",
+	"func_name": "sum",
+	"params": [
+		{ "kind": "input", "format": "real64_array", "type": "blob" },
+		{ "kind": "output", "format": "real64", "type": "real64" }
+	],
+	"threads_from": 0,
+	"block_size": 256,
+	"src": "./sum.cu"
+}
