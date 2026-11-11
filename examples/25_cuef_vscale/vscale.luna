@@ -1,0 +1,20 @@
+// Vector times a constant on the GPU: c = k * a, then s = sum(c).
+// fill and sum are ordinary C fragments (cpf),
+// scale is a CUDA fragment (cuef) with a scalar parameter k.
+
+import fill(in int n, in int k, out blob arr);
+import scale(in blob a, in real k, out blob c);
+import sum(in blob arr, out real s);
+
+sub vector_scale(n, k, s) {
+	name n, k, s, a, c;
+	fill(n, 1, a);
+	scale(a, k, c);
+	sum(c, s);
+}
+
+interface "clif" main (
+	"string" => int n,
+	"string" => real k,
+	"string" <= real s
+) on vector_scale;
