@@ -21,6 +21,7 @@ Run from the LuNA repository root:
 make
 source env.sh
 BUILD_DIR="$BUILD_DIR/_test_27_cuef_matrix" AZ_CUDA=emulate ./examples/27_cuef_matrix/test
+cat build/_test_27_cuef_matrix/result
 ```
 
-The test compares every element in both outputs. The input, `transpose.bin`, `row_sums.bin`, and intermediate LuNA files stay in `build/_test_27_cuef_matrix/` after the test. On a machine with CUDA, run with `AZ_CUDA=gpu` to use the GPU.
+The test writes the transpose and row sums to the text file `result` and compares it against `correct`. The binary input and outputs (`input.bin`, `transpose.bin`, `row_sums.bin`) and intermediate LuNA files also stay in `build/_test_27_cuef_matrix/`. On a machine with CUDA, run with `AZ_CUDA=gpu` to use the GPU.
