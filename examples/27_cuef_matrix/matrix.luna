@@ -1,15 +1,18 @@
+import make_matrix(in int rows, in int cols, out blob a);
 import transpose_and_sum(in blob a, in int rows, in int cols,
 	out blob transposed, out blob row_sums);
+import format_matrix(in int rows, in int cols, in blob transposed,
+	in blob row_sums, out blob report);
 
-sub summarize_matrix(a, rows, cols, transposed, row_sums) {
-	name a, rows, cols, transposed, row_sums;
+sub summarize_matrix(rows, cols, report) {
+	name rows, cols, report, a, transposed, row_sums;
+	make_matrix(rows, cols, a);
 	transpose_and_sum(a, rows, cols, transposed, row_sums);
+	format_matrix(rows, cols, transposed, row_sums, report);
 }
 
 interface "clif" main (
-	"path" => blob a,
 	"string" => int rows,
 	"string" => int cols,
-	"path" <= blob transposed,
-	"path" <= blob row_sums
+	"stdout" <= blob report
 ) on summarize_matrix;

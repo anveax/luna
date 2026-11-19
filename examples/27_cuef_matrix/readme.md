@@ -1,6 +1,6 @@
 # A matrix with `shape` and `work_size`
 
-This CUEF fragment transposes a matrix and sums its rows. With the test input, the two outputs are:
+The program reads `rows` and `cols` from stdin and fills the matrix with consecutive values starting at 1. The CUEF fragment transposes the matrix and sums its rows. With the test input of 2 rows and 3 columns, the two outputs are:
 
 ```text
 Input (2 × 3)    Transpose (3 × 2)    Row sums (2)
@@ -24,4 +24,4 @@ BUILD_DIR="$BUILD_DIR/_test_27_cuef_matrix" AZ_CUDA=emulate ./examples/27_cuef_m
 cat build/_test_27_cuef_matrix/result
 ```
 
-The test writes the transpose and row sums to the text file `result` and compares it against `correct`. The binary input and outputs (`input.bin`, `transpose.bin`, `row_sums.bin`) and intermediate LuNA files also stay in `build/_test_27_cuef_matrix/`. On a machine with CUDA, run with `AZ_CUDA=gpu` to use the GPU.
+The program passes the matrices between fragments as blobs and prints the formatted result to stdout. The test redirects stdout to `build/_test_27_cuef_matrix/result` and compares it against `correct`. The build directory also contains the intermediate LuNA files. On a machine with CUDA, run with `AZ_CUDA=gpu` to use the GPU.
