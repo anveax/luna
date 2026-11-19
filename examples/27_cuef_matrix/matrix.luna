@@ -1,0 +1,15 @@
+import transpose_and_sum(in blob a, in int rows, in int cols,
+	out blob transposed, out blob row_sums);
+
+sub summarize_matrix(a, rows, cols, transposed, row_sums) {
+	name a, rows, cols, transposed, row_sums;
+	transpose_and_sum(a, rows, cols, transposed, row_sums);
+}
+
+interface "clif" main (
+	"path" => blob a,
+	"string" => int rows,
+	"string" => int cols,
+	"path" <= blob transposed,
+	"path" <= blob row_sums
+) on summarize_matrix;

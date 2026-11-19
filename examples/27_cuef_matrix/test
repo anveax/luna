@@ -1,0 +1,36 @@
+#!/bin/bash
+
+set -euo pipefail
+
+: "${AZ:?Source env.sh from the LuNA repository}"
+: "${BUILD_DIR:?Source env.sh from the LuNA repository}"
+example_dir=$(cd -- "$(dirname -- "$0")" && pwd)
+test_dir=$(mktemp -d "$BUILD_DIR/cuef_matrix.XXXXXX")
+trap 'rm -rf "$test_dir"' EXIT
+mkdir "$test_dir/build"
+
+python3 - "$test_dir/input.bin" <<'PYTHON'
+from pathlib import Path
+from struct import pack
+from sys import argv
+
+Path(argv[1]).write_bytes(pack('=6d', 1, 2, 3, 4, 5, 6))
+PYTHON
+
+printf '%s\n' "$test_dir/input.bin" 2 3 "$test_dir/transpose.bin" "$test_dir/row_sums.bin" |
+	BUILD_DIR="$test_dir/build" "$AZ/bin/luna" "$example_dir/matrix.luna" > /dev/null
+
+python3 - "$test_dir" <<'PYTHON'
+from pathlib import Path
+from struct import pack
+from sys import argv
+
+directory = Path(argv[1])
+expected = {
+    'transpose.bin': (1, 4, 2, 5, 3, 6),
+    'row_sums.bin': (6, 15),
+}
+for name, values in expected.items():
+    if (directory / name).read_bytes() != pack(f'={len(values)}d', *values):
+        raise SystemExit(f'Unexpected output in {name}. Expected {values}')
+PYTHON

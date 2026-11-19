@@ -1,0 +1,17 @@
+{
+	"type": "codefrag",
+	"format": "cuef",
+	"func_name": "transpose_and_sum",
+	"params": [
+		{ "kind": "input", "format": "real64_array", "type": "blob",
+			"shape": [{ "param": 1 }, { "param": 2 }] },
+		{ "kind": "input", "format": "int32", "type": "int32" },
+		{ "kind": "input", "format": "int32", "type": "int32" },
+		{ "kind": "output", "format": "real64_array", "type": "blob",
+			"shape": [{ "param": 2 }, { "param": 1 }] },
+		{ "kind": "output", "format": "real64_array", "type": "blob",
+			"size_from": 1 }
+	],
+	"work_size": { "param": 0 },
+	"src": ["./sum_row.cuh", "./matrix.cu"]
+}
