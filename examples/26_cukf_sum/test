@@ -31,3 +31,61 @@ echo -e "$INPUT" | $AZ/bin/luna $FILE > "$BD/result"
 # verify output
 echo -e "$OUTPUT" > $BD/correct
 diff $BD/correct $BD/result
+
+# An explicit 2D grid with padding on both axes.
+matrix=$(mktemp -d "$BD/grid.XXXXXX")
+trap 'rm -rf "$matrix"' EXIT
+mkdir "$matrix/coordinates" "$matrix/build"
+
+cat > "$matrix/grid.luna" <<'LUNA'
+import coordinates(in int rows, in int cols, out blob a);
+
+sub make_grid(rows, cols, a) {
+	name rows, cols, a;
+	coordinates(rows, cols, a);
+}
+
+interface "clif" main (
+	"string" => int rows,
+	"string" => int cols,
+	"path" <= blob a
+) on make_grid;
+LUNA
+
+cat > "$matrix/coordinates/manifest.json" <<'JSON'
+{
+	"type": "codefrag",
+	"format": "cukf",
+	"func_name": "coordinates",
+	"params": [
+		{ "kind": "input", "format": "int32", "type": "int32" },
+		{ "kind": "input", "format": "int32", "type": "int32" },
+		{ "kind": "output", "format": "int32_array", "type": "blob",
+			"shape": [{ "param": 0 }, { "param": 1 }] }
+	],
+	"launch": { "grid": [2, 3], "block": [4, 2] },
+	"src": "./coordinates.cu"
+}
+JSON
+
+cat > "$matrix/coordinates/coordinates.cu" <<'CUDA'
+__global__ void coordinates(int rows, int cols, int *a) {
+	int col = blockIdx.x * blockDim.x + threadIdx.x;
+	int row = blockIdx.y * blockDim.y + threadIdx.y;
+	if (row < rows && col < cols)
+		a[row * cols + col] = row * 100 + col + 1;
+}
+CUDA
+
+printf '%s\n' 5 7 "$matrix/output.bin" |
+	BUILD_DIR="$matrix/build" "$AZ/bin/luna" "$matrix/grid.luna" > /dev/null
+
+python3 - "$matrix/output.bin" <<'PYTHON'
+from pathlib import Path
+from struct import pack
+from sys import argv
+
+expected = pack('=35i', *(row * 100 + col + 1 for row in range(5) for col in range(7)))
+if Path(argv[1]).read_bytes() != expected:
+    raise SystemExit('unexpected 2D grid output')
+PYTHON

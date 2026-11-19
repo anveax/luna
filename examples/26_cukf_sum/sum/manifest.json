@@ -3,10 +3,11 @@
 	"format": "cukf",
 	"func_name": "sum",
 	"params": [
-		{ "kind": "input", "format": "real64_array", "type": "blob" },
+		{ "kind": "input", "format": "real64_array", "type": "blob",
+			"shape": [{ "param": 1 }] },
+		{ "kind": "input", "format": "int32", "type": "int32" },
 		{ "kind": "output", "format": "real64", "type": "real64" }
 	],
-	"threads_from": 0,
-	"block_size": 256,
+	"launch": { "extent": [{ "param": 1 }], "block": [256] },
 	"src": "./sum.cu"
 }

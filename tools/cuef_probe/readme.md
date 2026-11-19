@@ -20,6 +20,9 @@ The output shows whether `i == block * 256 + thread` for every element,
 how many SMs took part, and how long all calls took together compared with
 the time they would take one after another.
 
+Each output array takes its length from `N` via `size_from`. The wrapper
+uses that shared output length to decide how many times to call `probe`.
+
 The probe works only on the GPU: `threadIdx`, `blockIdx`, `%smid` and
 `%globaltimer` do not exist in emulation. That is why it lives here and not
 in `examples/`, which are also run with `AZ_CUDA=emulate`.

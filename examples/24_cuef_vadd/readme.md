@@ -19,12 +19,12 @@ checks.
 ### The user function
 
 ```
-__device__ void <func_name>(int i, int n, <one argument per parameter>);
+__device__ void <func_name>(int i, <one argument per parameter>);
 ```
 
-- `i` is the index of the element, `0 <= i < n`;
-- `n` is the number of elements (one GPU thread per element);
-- then one argument for each manifest parameter, in the same order:
+The wrapper passes the linear element index `i` and one argument for each
+manifest parameter in the same order. Declare an `int32` input if the
+function also needs the number of elements.
 
 | `format`       | `type`   | input argument     | output argument |
 |----------------|----------|--------------------|-----------------|
@@ -46,22 +46,31 @@ starts, so it is part of the format.
 - `format`: `"cuef"`;
 - `func_name`: the name of the `__device__` function;
 - `params`: as in `cpf`, with the formats from the table above;
-- `threads_from`: the index of the input parameter that sets `n`. If that
-  parameter is an array, `n` is its number of elements; if it is an
-  `int32`, `n` is its value;
-- `size_from` (outputs only): the number of elements of the output array,
-  by the same rule as `threads_from`;
-- `src`: the source file (or a list of files) with the function. It is
-  included into the generated code.
+- `src` lists the source files in inclusion order, or names one file.
+- `work_size` optionally sets the number of calls as a nonnegative integer or
+  a reference such as `{"param": 0}`. A reference uses the number of
+  elements in an input array or the value of an `int32` input. By default
+  the wrapper uses the common output length. Outputs of different lengths
+  require an explicit `work_size`.
+
+Each output array declares its element count with exactly one of `size`,
+`size_from`, or `shape`. A `size` is a literal, and `size_from` is a
+zero-based index of an input array or `int32` input. A `shape` gives the
+dimensions of a contiguous, row-major array. A dimension is a nonnegative
+integer or a reference to an `int32` input. Input arrays may also declare
+their `shape` to validate the number of bytes received.
+
+This example sizes its output with `"size_from": 0`, so its number of
+calls equals the length of the first input vector.
 
 ### Rules
 
 - Outputs can only be arrays. A single number cannot be written
   by many threads at once: compute it afterwards with another fragment
   (as `sum` does here).
-- Elements must be computed independently: the call for element `i`
-  should write only element `i` of each output and must not read outputs
-  written by other calls.
+- Calls must be independent. The usual pattern writes element `i` of each
+  output. The function must keep every write in bounds and must not read
+  outputs written by other calls.
 - Strings are not supported.
 - Output arrays are filled with zeros before the call, both on the GPU and
   in emulation.
@@ -77,3 +86,9 @@ starts, so it is part of the format.
   `atomicAdd`, ...) does not compile in this mode.
 - Only the `bar` interpreter runs `cuef` fragments so far; the other
   branches of the pipeline (gcc, MPI) do not support them yet.
+
+Run this command from the repository root to inspect the wrapper and CLIF manifest.
+
+```sh
+node scripts/gen_clif_cuda_wrapper.js examples/24_cuef_vadd/vadd /tmp/vadd-wrapper
+```

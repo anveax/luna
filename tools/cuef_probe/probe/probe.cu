@@ -12,7 +12,7 @@ __device__ static unsigned long long probe_now_ns() {
 	return t;
 }
 
-__device__ void probe(int i, int n, int count, int delay_us,
+__device__ void probe(int i, int /* count */, int delay_us,
 		int *block, int *thread, int *sm, double *t_start, double *t_end) {
 	unsigned int smid;
 	asm volatile("mov.u32 %0, %%smid;" : "=r"(smid));

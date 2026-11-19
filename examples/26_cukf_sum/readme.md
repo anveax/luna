@@ -20,11 +20,11 @@ kernel launch and the error checks.
 ### The kernel
 
 ```
-__global__ void <func_name>(int n, <one argument per parameter>);
+__global__ void <func_name>(<one argument per parameter>);
 ```
 
-- `n` is the number of threads set by `threads_from`;
-- then one argument for each manifest parameter, in the same order:
+The arguments follow the manifest parameter order. In this example `n`
+is an explicit `int32` input passed from the LuNA program.
 
 | `format`       | `type`   | input argument     | output argument |
 |----------------|----------|--------------------|-----------------|
@@ -46,25 +46,30 @@ not compile.
 - `format`: `"cukf"`;
 - `func_name`: the name of the kernel;
 - `params`: with the formats from the table above;
-- `threads_from`: the index of the input parameter that sets `n`. If that
-  parameter is an array, `n` is its number of elements; if it is an
-  `int32`, `n` is its value;
-- `block_size` (optional, 1 to 1024, default 256): threads per block;
-- `size_from` (output arrays only): the number of elements of the output
-  array, by the same rule as `threads_from`;
-- `src`: the source file (or a list of files) with the kernel. It is
-  included into the generated code.
+- `launch` specifies either `extent` (logical work
+  dimensions) or `grid` (exact block counts), and a `block` shape. CUDA
+  dimensions are ordered `x, y, z`. For a one-dimensional launch the
+  block shape defaults to `[256]`.
+- `src` lists the source files in inclusion order, or names one file.
+
+An input array can declare a `shape` to validate its byte count. Output
+arrays declare their size with `size`, `size_from`, or `shape` as in CUEF.
+Here `"shape": [{"param": 1}]` checks that `a` contains `n` elements.
 
 ### The launch
 
-- The kernel is launched once, with `ceil(n / block_size)` blocks of
-  `block_size` threads. The last block may be incomplete, so there may be
-  more threads than `n`: the kernel must check `i < n`. If `n = 0`, the
-  kernel is not launched.
-- The macro `CUKF_BLOCK_SIZE` equals the block size. Use it for arrays in
+- The reduction sets `"launch": {"extent": [{"param": 1}], "block": [256]}`.
+  This launches `ceil(n / 256)` blocks of 256 threads, so the last block
+  may include threads with `i >= n`. A zero work dimension skips launch.
+- The macro `CUKF_BLOCK_SIZE` gives the number of threads in a block
+  (the product of its dimensions). Use it for arrays in
   shared memory: `__shared__ double part[CUKF_BLOCK_SIZE];`. Dynamic shared
   memory (`extern __shared__`) is not supported.
 - All outputs (arrays and numbers) are filled with zeros before the launch.
+
+The test also launches a two-dimensional grid for a 5 × 7 output matrix
+with `"launch": {"grid": [2, 3], "block": [4, 2]}`. Threads outside the
+matrix skip their writes. The test compares every output element.
 
 ### Rules
 
@@ -87,3 +92,9 @@ not compile.
   `AZ_CUDA=emulate` they fail (so `bar` can use an alternative fragment, if
   there is one); this test is then skipped.
 - Only the `bar` interpreter runs `cukf` fragments so far.
+
+Run this command from the repository root to inspect the wrapper and CLIF manifest.
+
+```sh
+node scripts/gen_clif_cuda_wrapper.js examples/26_cukf_sum/sum /tmp/sum-wrapper
+```

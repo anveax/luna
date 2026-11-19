@@ -2,7 +2,7 @@
 // Every block adds up its part of the array in shared memory, then adds
 // the result to the total with an atomic operation. The block size must be
 // a power of two.
-__global__ void sum(int n, const double *a, double *s)
+__global__ void sum(const double *a, int n, double *s)
 {
 	__shared__ double part[CUKF_BLOCK_SIZE];
 	int t = threadIdx.x;

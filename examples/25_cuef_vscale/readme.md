@@ -5,7 +5,7 @@ Vector times a constant on the GPU
 CUDA fragment `scale` also takes a scalar parameter `k`:
 
 ```
-__device__ void scale(int i, int n, const double *a, double k, double *c)
+__device__ void scale(int i, const double *a, double k, double *c)
 ```
 
 In `scale/manifest.json` the scalar is an ordinary input parameter
@@ -16,5 +16,11 @@ arrays (`int32_array` or `real64_array`).
 
 The constant can also be written in the program itself, for example
 `scale(a, 2.5, c);`.
+
+The test also transposes a 2 × 3 matrix and compares all six output
+elements in row-major order. It declares the input shape as
+`[2, {"param": 1}]` and the output shape as `[{"param": 1}, 2]`, where
+parameter 1 supplies the column count. The wrapper derives the work size
+from the output shape.
 
 See `24_cuef_vadd/readme.md` for the description of the `cuef` format.

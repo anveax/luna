@@ -8,6 +8,5 @@
 		{ "kind": "output", "format": "real64_array", "type": "blob",
 			"size_from": 0 }
 	],
-	"threads_from": 0,
 	"src": "./vadd.cu"
 }
