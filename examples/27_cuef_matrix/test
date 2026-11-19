@@ -7,9 +7,35 @@ set -euo pipefail
 example_dir=$(cd -- "$(dirname -- "$0")" && pwd)
 mkdir -p -- "$BUILD_DIR"
 test_dir=$(cd -- "$BUILD_DIR" && pwd)
+data_dir=$(mktemp -d "${TMPDIR:-/tmp}/luna-matrix.XXXXXX")
+trap 'rm -rf -- "$data_dir"' EXIT
 
-printf '%s\n' 2 3 |
-	BUILD_DIR="$test_dir" "$AZ/bin/luna" "$example_dir/matrix.luna" > "$test_dir/result"
+python3 - "$data_dir/input.bin" <<'PYTHON'
+from pathlib import Path
+from struct import pack
+from sys import argv
+
+Path(argv[1]).write_bytes(pack('=6d', 1, 2, 3, 4, 5, 6))
+PYTHON
+
+printf '%s\n' "$data_dir/input.bin" 2 3 "$data_dir/transpose.bin" "$data_dir/row_sums.bin" |
+	BUILD_DIR="$test_dir" "$AZ/bin/luna" "$example_dir/matrix.luna"
+
+python3 - "$data_dir" > "$test_dir/result" <<'PYTHON'
+from pathlib import Path
+from struct import unpack
+from sys import argv
+
+directory = Path(argv[1])
+transposed = unpack('=6d', (directory / 'transpose.bin').read_bytes())
+row_sums = unpack('=2d', (directory / 'row_sums.bin').read_bytes())
+
+print('Transposed matrix (3 x 2)')
+for offset in range(0, len(transposed), 2):
+    print(*(format(value, '.17g') for value in transposed[offset:offset + 2]))
+print('Row sums')
+print(*(format(value, '.17g') for value in row_sums))
+PYTHON
 
 cat > "$test_dir/correct" <<'EXPECTED'
 Transposed matrix (3 x 2)
